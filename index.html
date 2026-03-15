@@ -1,0 +1,289 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Ramraj Daily Collection</title>
+    <link rel="stylesheet" href="style.css">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+</head>
+<body>
+    <!-- Sidebar -->
+    <nav class="sidebar" id="sidebar">
+        <div class="sidebar-header">
+            <h2>Ramraj</h2>
+            <span class="subtitle">Daily Collection</span>
+        </div>
+        <ul class="nav-links">
+            <li class="active" data-page="dashboard">
+                <span class="icon">&#9632;</span> Dashboard
+            </li>
+            <li data-page="entry">
+                <span class="icon">&#9998;</span> Data Entry
+            </li>
+            <li data-page="sales">
+                <span class="icon">&#9650;</span> Sales Analysis
+            </li>
+            <li data-page="target">
+                <span class="icon">&#9673;</span> Target vs Achievement
+            </li>
+            <li data-page="records">
+                <span class="icon">&#9776;</span> All Records
+            </li>
+        </ul>
+        <div class="sidebar-footer">
+            <button class="btn-export" onclick="exportData()">Export CSV</button>
+        </div>
+    </nav>
+
+    <!-- Main Content -->
+    <main class="main-content">
+        <!-- Top Bar -->
+        <header class="top-bar">
+            <button class="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
+            <h1 id="page-title">Dashboard</h1>
+            <div class="top-right">
+                <span id="current-date"></span>
+            </div>
+        </header>
+
+        <!-- Dashboard Page -->
+        <section class="page active" id="page-dashboard">
+            <!-- KPI Cards -->
+            <div class="kpi-grid">
+                <div class="kpi-card">
+                    <div class="kpi-label">Today's Sale</div>
+                    <div class="kpi-value" id="kpi-sale">--</div>
+                    <div class="kpi-sub" id="kpi-sale-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Bills</div>
+                    <div class="kpi-value" id="kpi-bills">--</div>
+                    <div class="kpi-sub" id="kpi-bills-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Quantity Sold</div>
+                    <div class="kpi-value" id="kpi-qty">--</div>
+                    <div class="kpi-sub" id="kpi-qty-sub"></div>
+                </div>
+                <div class="kpi-card accent">
+                    <div class="kpi-label">Target vs Achievement</div>
+                    <div class="kpi-value" id="kpi-tar">--</div>
+                    <div class="kpi-sub" id="kpi-tar-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">ATV</div>
+                    <div class="kpi-value" id="kpi-atv">--</div>
+                    <div class="kpi-sub">Avg Transaction Value</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">UPT</div>
+                    <div class="kpi-value" id="kpi-upt">--</div>
+                    <div class="kpi-sub">Units Per Transaction</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">ASP</div>
+                    <div class="kpi-value" id="kpi-asp">--</div>
+                    <div class="kpi-sub">Avg Selling Price</div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">CY MTD Sale</div>
+                    <div class="kpi-value" id="kpi-mtd">--</div>
+                    <div class="kpi-sub" id="kpi-mtd-sub"></div>
+                </div>
+            </div>
+
+            <!-- Charts Row -->
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>Daily Sales Trend (Last 30 Days)</h3>
+                    <canvas id="dashSalesChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Target Progress</h3>
+                    <canvas id="dashTargetChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Data Entry Page -->
+        <section class="page" id="page-entry">
+            <div class="form-card">
+                <h2>Daily Report Entry</h2>
+                <form id="entryForm" onsubmit="return saveEntry(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="f-date">Date</label>
+                            <input type="date" id="f-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-open">Store Opening Time</label>
+                            <input type="time" id="f-open" value="09:30" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-close">Store Closing Time</label>
+                            <input type="time" id="f-close" value="21:30" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-sale">Sale (&#8377;)</label>
+                            <input type="number" id="f-sale" placeholder="e.g. 144299" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-bills">Bills</label>
+                            <input type="number" id="f-bills" placeholder="e.g. 81" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-qty">Quantity</label>
+                            <input type="number" id="f-qty" placeholder="e.g. 330" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-atv">ATV</label>
+                            <input type="number" step="0.01" id="f-atv" placeholder="Auto-calculated" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-upt">UPT</label>
+                            <input type="number" step="0.01" id="f-upt" placeholder="Auto-calculated" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-asp">ASP</label>
+                            <input type="number" step="0.01" id="f-asp" placeholder="Auto-calculated" readonly>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-cymtd">CY MTD Sale (&#8377;)</label>
+                            <input type="number" id="f-cymtd" placeholder="e.g. 823796" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-cymtdavg">CY MTD Avg Sale (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-cymtdavg" placeholder="e.g. 54920" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-trend">Sales Trend (&#8377;)</label>
+                            <input type="number" id="f-trend" placeholder="e.g. 1702512" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-target">Target (&#8377;)</label>
+                            <input type="number" id="f-target" placeholder="e.g. 3500000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="f-tarach">Target vs Achievement (%)</label>
+                            <input type="number" step="0.01" id="f-tarach" placeholder="Auto-calculated" readonly>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary" id="submitBtn">Save Entry</button>
+                        <button type="button" class="btn-secondary" onclick="resetForm()">Clear</button>
+                    </div>
+                </form>
+            </div>
+            <div id="entry-message" class="message hidden"></div>
+        </section>
+
+        <!-- Sales Analysis Page -->
+        <section class="page" id="page-sales">
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>Daily Sales Over Time</h3>
+                    <canvas id="salesLineChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Bills vs Quantity</h3>
+                    <canvas id="billsQtyChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card">
+                    <h3>ATV Trend</h3>
+                    <canvas id="atvChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>UPT Trend</h3>
+                    <canvas id="uptChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>ASP Trend</h3>
+                    <canvas id="aspChart"></canvas>
+                </div>
+            </div>
+        </section>
+
+        <!-- Target vs Achievement Page -->
+        <section class="page" id="page-target">
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>MTD Sales vs Target</h3>
+                    <canvas id="targetBarChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Achievement Rate Over Time</h3>
+                    <canvas id="achRateChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>Sales Trend vs Target Projection</h3>
+                    <canvas id="trendProjectionChart"></canvas>
+                </div>
+            </div>
+            <!-- Summary Table -->
+            <div class="table-card">
+                <h3>Monthly Summary</h3>
+                <div class="table-wrapper">
+                    <table id="monthlySummaryTable">
+                        <thead>
+                            <tr>
+                                <th>Month</th>
+                                <th>Total Sale</th>
+                                <th>Avg Daily Sale</th>
+                                <th>Total Bills</th>
+                                <th>Avg ATV</th>
+                                <th>Avg UPT</th>
+                                <th>Target</th>
+                                <th>Achievement</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+
+        <!-- All Records Page -->
+        <section class="page" id="page-records">
+            <div class="table-controls">
+                <input type="text" id="searchRecords" placeholder="Search by date..." oninput="filterRecords()">
+                <select id="filterMonth" onchange="filterRecords()">
+                    <option value="">All Months</option>
+                </select>
+            </div>
+            <div class="table-card">
+                <div class="table-wrapper">
+                    <table id="recordsTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Open</th>
+                                <th>Close</th>
+                                <th>Sale</th>
+                                <th>Bills</th>
+                                <th>QTY</th>
+                                <th>ATV</th>
+                                <th>UPT</th>
+                                <th>ASP</th>
+                                <th>CY MTD</th>
+                                <th>MTD Avg</th>
+                                <th>Trend</th>
+                                <th>Target</th>
+                                <th>Ach%</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
+        </section>
+    </main>
+
+    <script src="app.js"></script>
+</body>
+</html>

@@ -1,5 +1,22 @@
 // ==================== DATA STORE (In-Memory Only - clears on reload) ====================
-let appData = [];
+let appData = [
+    {
+        date: '2026-03-15',
+        openTime: '09:30',
+        closeTime: '21:30',
+        sale: 144299,
+        bills: 81,
+        qty: 330,
+        atv: 1781.47,
+        upt: 4.07,
+        asp: 437.27,
+        cymtd: 823796,
+        cymtdAvg: 54920,
+        trend: 1702512,
+        target: 3500000,
+        tarAch: 23.54
+    }
+];
 
 function getData() {
     return appData;

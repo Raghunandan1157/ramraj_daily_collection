@@ -1,29 +1,110 @@
-// ==================== DATA STORE (In-Memory Only - clears on reload) ====================
-let appData = [
-    {
-        date: '2026-03-15',
-        openTime: '09:30',
-        closeTime: '21:30',
-        sale: 144299,
-        bills: 81,
-        qty: 330,
-        atv: 1781.47,
-        upt: 4.07,
-        asp: 437.27,
-        cymtd: 823796,
-        cymtdAvg: 54920,
-        trend: 1702512,
-        target: 3500000,
-        tarAch: 23.54
+// ==================== SUPABASE CLIENT ====================
+const SUPABASE_URL = 'https://zovnmmdfthpbubrorsgh.supabase.co';
+const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE';
+const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
+
+// ==================== DATA STORE (Supabase-backed) ====================
+let appData = [];
+
+async function fetchData() {
+    const { data, error } = await db
+        .from('daily_sales')
+        .select('*')
+        .order('date', { ascending: true });
+
+    if (error) {
+        console.error('Error fetching data:', error);
+        return [];
     }
-];
+
+    // Map Supabase columns to the app's expected format
+    appData = data.map(row => {
+        const sales = Number(row.sales) || 0;
+        const bills = Number(row.no_of_bills) || 0;
+        const qty = Number(row.quantity) || 0;
+        const netSales = Number(row.net_sales) || 0;
+        // Strip seconds from time if present (e.g. "09:30:00" -> "09:30")
+        const openTime = (row.open_time || '09:30').substring(0, 5);
+        const closeTime = (row.close_time || '21:30').substring(0, 5);
+
+        return {
+            id: row.id,
+            date: row.date,
+            openTime,
+            closeTime,
+            sale: sales,
+            bills: bills,
+            qty: qty,
+            atv: Number(row.atv) || (bills > 0 ? sales / bills : 0),
+            upt: Number(row.upt) || 0,
+            asp: Number(row.asp) || 0,
+            cymtd: Number(row.cy_mtd_sale) || 0,
+            cymtdAvg: Number(row.cy_mtd_avg_sale) || 0,
+            trend: Number(row.sales_trend) || 0,
+            target: Number(row.target) || 0,
+            tarAch: Number(row.target_achievement) || 0,
+            // Extra fields from Excel
+            salesReturns: Number(row.sales_returns) || 0,
+            netSales: netSales,
+            closingStock: Number(row.closing_stock) || 0,
+            bankBalance: Number(row.bank_balance) || 0,
+            ordersPlaced: Number(row.orders_placed_amount) || 0,
+            salaryPaid: Number(row.salary_paid) || 0,
+            electricityPaid: Number(row.electricity_paid) || 0,
+            adminExpenses: Number(row.admin_expenses) || 0,
+            totalExpenses: Number(row.total_expenses) || 0
+        };
+    });
+
+    return appData;
+}
 
 function getData() {
     return appData;
 }
 
-function saveData(data) {
-    appData = data;
+async function saveToSupabase(entry) {
+    const row = {
+        date: entry.date,
+        open_time: entry.openTime,
+        close_time: entry.closeTime,
+        sales: entry.sale,
+        no_of_bills: entry.bills,
+        quantity: entry.qty,
+        atv: entry.atv,
+        upt: entry.upt,
+        asp: entry.asp,
+        cy_mtd_sale: entry.cymtd,
+        cy_mtd_avg_sale: entry.cymtdAvg,
+        sales_trend: entry.trend,
+        target: entry.target,
+        target_achievement: entry.tarAch,
+        net_sales: entry.sale - (entry.salesReturns || 0)
+    };
+
+    const { data, error } = await db
+        .from('daily_sales')
+        .upsert(row, { onConflict: 'date' })
+        .select();
+
+    if (error) {
+        console.error('Error saving:', error);
+        return false;
+    }
+    return true;
+}
+
+async function deleteFromSupabase(date) {
+    const { error } = await db
+        .from('daily_sales')
+        .delete()
+        .eq('date', date);
+
+    if (error) {
+        console.error('Error deleting:', error);
+        return false;
+    }
+    return true;
 }
 
 // ==================== NAVIGATION ====================
@@ -105,7 +186,7 @@ function autoCalc() {
 // ==================== SAVE / EDIT ENTRY ====================
 let editingDate = null;
 
-function saveEntry(e) {
+async function saveEntry(e) {
     e.preventDefault();
 
     const entry = {
@@ -125,25 +206,25 @@ function saveEntry(e) {
         tarAch: parseFloat(fTarAch.value)
     };
 
-    let data = getData();
-
-    if (editingDate) {
-        data = data.filter(d => d.date !== editingDate);
-        editingDate = null;
-        document.getElementById('submitBtn').textContent = 'Save Entry';
-    } else {
+    if (!editingDate) {
         // Check for duplicate date
-        if (data.some(d => d.date === entry.date)) {
+        if (appData.some(d => d.date === entry.date)) {
             showMessage('Entry for this date already exists. Use edit from Records page.', 'error');
             return false;
         }
     }
 
-    data.push(entry);
-    data.sort((a, b) => a.date.localeCompare(b.date));
-    saveData(data);
-    showMessage('Entry saved successfully!', 'success');
-    resetForm();
+    const success = await saveToSupabase(entry);
+    if (success) {
+        showMessage('Entry saved to Supabase!', 'success');
+        editingDate = null;
+        document.getElementById('submitBtn').textContent = 'Save Entry';
+        resetForm();
+        await fetchData(); // Refresh local data
+    } else {
+        showMessage('Error saving entry. Check console.', 'error');
+    }
+
     return false;
 }
 
@@ -193,11 +274,13 @@ function editEntry(date) {
     pageTitle.textContent = 'Data Entry';
 }
 
-function deleteEntry(date) {
+async function deleteEntry(date) {
     if (!confirm('Delete entry for ' + date + '?')) return;
-    let data = getData().filter(d => d.date !== date);
-    saveData(data);
-    renderRecordsTable();
+    const success = await deleteFromSupabase(date);
+    if (success) {
+        await fetchData();
+        renderRecordsTable();
+    }
 }
 
 // ==================== FORMATTING ====================
@@ -213,8 +296,9 @@ function fmtCurrency(n) {
 
 function formatTime(t) {
     if (!t) return '--';
-    const [h, m] = t.split(':');
-    const hr = parseInt(h);
+    const parts = t.split(':');
+    const hr = parseInt(parts[0]);
+    const m = parts[1];
     const ampm = hr >= 12 ? 'PM' : 'AM';
     const hr12 = hr % 12 || 12;
     return hr12 + ':' + m + ' ' + ampm;
@@ -234,14 +318,9 @@ function renderDashboard() {
     const latest = data.length > 0 ? data[data.length - 1] : null;
 
     if (!latest) {
-        document.getElementById('kpi-sale').textContent = '--';
-        document.getElementById('kpi-bills').textContent = '--';
-        document.getElementById('kpi-qty').textContent = '--';
-        document.getElementById('kpi-tar').textContent = '--';
-        document.getElementById('kpi-atv').textContent = '--';
-        document.getElementById('kpi-upt').textContent = '--';
-        document.getElementById('kpi-asp').textContent = '--';
-        document.getElementById('kpi-mtd').textContent = '--';
+        ['kpi-sale','kpi-netsales','kpi-bills','kpi-returns','kpi-stock','kpi-bank','kpi-orders','kpi-expenses'].forEach(id => {
+            document.getElementById(id).textContent = '--';
+        });
         return;
     }
 
@@ -249,23 +328,25 @@ function renderDashboard() {
     const prev = data.length > 1 ? data[data.length - 2] : null;
 
     document.getElementById('kpi-sale').textContent = fmtCurrency(latest.sale);
+    document.getElementById('kpi-netsales').textContent = fmtCurrency(latest.netSales);
     document.getElementById('kpi-bills').textContent = fmt(latest.bills);
-    document.getElementById('kpi-qty').textContent = fmt(latest.qty);
-    document.getElementById('kpi-tar').textContent = latest.tarAch.toFixed(1) + '%';
-    document.getElementById('kpi-atv').textContent = fmtCurrency(latest.atv);
-    document.getElementById('kpi-upt').textContent = latest.upt.toFixed(2);
-    document.getElementById('kpi-asp').textContent = fmtCurrency(latest.asp);
-    document.getElementById('kpi-mtd').textContent = fmtCurrency(latest.cymtd);
+    document.getElementById('kpi-returns').textContent = fmtCurrency(latest.salesReturns);
+    document.getElementById('kpi-stock').textContent = fmtCurrency(latest.closingStock);
+    document.getElementById('kpi-bank').textContent = fmtCurrency(latest.bankBalance);
+    document.getElementById('kpi-orders').textContent = fmtCurrency(latest.ordersPlaced);
+    document.getElementById('kpi-expenses').textContent = fmtCurrency(latest.totalExpenses);
 
     // Comparison subs
     if (prev) {
         setSub('kpi-sale-sub', latest.sale, prev.sale, true);
+        setSub('kpi-netsales-sub', latest.netSales, prev.netSales, true);
         setSub('kpi-bills-sub', latest.bills, prev.bills, false);
-        setSub('kpi-qty-sub', latest.qty, prev.qty, false);
+        setSub('kpi-returns-sub', latest.salesReturns, prev.salesReturns, false);
+        setSub('kpi-stock-sub', latest.closingStock, prev.closingStock, true);
+        setSub('kpi-bank-sub', latest.bankBalance, prev.bankBalance, true);
     }
 
-    document.getElementById('kpi-tar-sub').textContent = 'Target: ' + fmtCurrency(latest.target);
-    document.getElementById('kpi-mtd-sub').textContent = 'Avg: ' + fmtCurrency(latest.cymtdAvg);
+    document.getElementById('kpi-expenses-sub').textContent = 'Salary + Electricity + Admin';
 
     // Sales trend chart
     const last30 = data.slice(-30);
@@ -563,10 +644,10 @@ function renderMonthlySummary(data) {
         const totalSale = entries.reduce((s, e) => s + e.sale, 0);
         const avgSale = totalSale / entries.length;
         const totalBills = entries.reduce((s, e) => s + e.bills, 0);
-        const avgAtv = entries.reduce((s, e) => s + e.atv, 0) / entries.length;
-        const avgUpt = entries.reduce((s, e) => s + e.upt, 0) / entries.length;
-        const lastTarget = entries[entries.length - 1].target;
-        const lastAch = entries[entries.length - 1].tarAch;
+        const totalReturns = entries.reduce((s, e) => s + e.salesReturns, 0);
+        const totalNetSales = entries.reduce((s, e) => s + e.netSales, 0);
+        const totalExpenses = entries.reduce((s, e) => s + e.totalExpenses, 0);
+        const avgBank = entries.reduce((s, e) => s + e.bankBalance, 0) / entries.length;
 
         const [y, m] = key.split('-');
         const monthName = new Date(y, m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
@@ -577,10 +658,10 @@ function renderMonthlySummary(data) {
             <td>${fmtCurrency(totalSale)}</td>
             <td>${fmtCurrency(avgSale)}</td>
             <td>${fmt(totalBills)}</td>
-            <td>${fmtCurrency(avgAtv)}</td>
-            <td>${avgUpt.toFixed(2)}</td>
-            <td>${fmtCurrency(lastTarget)}</td>
-            <td class="${achClass(lastAch)}">${lastAch.toFixed(1)}%</td>
+            <td>${fmtCurrency(totalReturns)}</td>
+            <td>${fmtCurrency(totalNetSales)}</td>
+            <td>${fmtCurrency(totalExpenses)}</td>
+            <td>${fmtCurrency(avgBank)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -616,19 +697,17 @@ function renderRecordsTable() {
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${d.date}</td>
-            <td>${formatTime(d.openTime)}</td>
-            <td>${formatTime(d.closeTime)}</td>
             <td>${fmtCurrency(d.sale)}</td>
             <td>${d.bills}</td>
-            <td>${d.qty}</td>
-            <td>${fmtCurrency(d.atv)}</td>
-            <td>${d.upt.toFixed(2)}</td>
-            <td>${fmtCurrency(d.asp)}</td>
-            <td>${fmtCurrency(d.cymtd)}</td>
-            <td>${fmtCurrency(d.cymtdAvg)}</td>
-            <td>${fmtCurrency(d.trend)}</td>
-            <td>${fmtCurrency(d.target)}</td>
-            <td class="${achClass(d.tarAch)}">${d.tarAch.toFixed(1)}%</td>
+            <td>${fmtCurrency(d.salesReturns)}</td>
+            <td>${fmtCurrency(d.netSales)}</td>
+            <td>${fmtCurrency(d.closingStock)}</td>
+            <td>${fmtCurrency(d.bankBalance)}</td>
+            <td>${fmtCurrency(d.ordersPlaced)}</td>
+            <td>${fmtCurrency(d.salaryPaid)}</td>
+            <td>${fmtCurrency(d.electricityPaid)}</td>
+            <td>${fmtCurrency(d.adminExpenses)}</td>
+            <td>${fmtCurrency(d.totalExpenses)}</td>
             <td>
                 <button class="btn-edit" onclick="editEntry('${d.date}')">Edit</button>
                 <button class="btn-delete" onclick="deleteEntry('${d.date}')">Del</button>
@@ -669,4 +748,10 @@ function exportData() {
 }
 
 // ==================== INIT ====================
-renderDashboard();
+async function init() {
+    await fetchData();
+    renderDashboard();
+    console.log('Supabase connected. Loaded ' + appData.length + ' records.');
+}
+
+init();

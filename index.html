@@ -6,6 +6,7 @@
     <title>Ramraj Daily Collection</title>
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
+    <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
 <body>
     <!-- Sidebar -->
@@ -57,39 +58,39 @@
                     <div class="kpi-sub" id="kpi-sale-sub"></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Bills</div>
+                    <div class="kpi-label">Net Sales</div>
+                    <div class="kpi-value" id="kpi-netsales">--</div>
+                    <div class="kpi-sub" id="kpi-netsales-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">No. of Bills</div>
                     <div class="kpi-value" id="kpi-bills">--</div>
                     <div class="kpi-sub" id="kpi-bills-sub"></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Quantity Sold</div>
-                    <div class="kpi-value" id="kpi-qty">--</div>
-                    <div class="kpi-sub" id="kpi-qty-sub"></div>
+                    <div class="kpi-label">Sales Returns</div>
+                    <div class="kpi-value" id="kpi-returns">--</div>
+                    <div class="kpi-sub" id="kpi-returns-sub"></div>
                 </div>
                 <div class="kpi-card accent">
-                    <div class="kpi-label">Target vs Achievement</div>
-                    <div class="kpi-value" id="kpi-tar">--</div>
-                    <div class="kpi-sub" id="kpi-tar-sub"></div>
+                    <div class="kpi-label">Closing Stock</div>
+                    <div class="kpi-value" id="kpi-stock">--</div>
+                    <div class="kpi-sub" id="kpi-stock-sub"></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">ATV</div>
-                    <div class="kpi-value" id="kpi-atv">--</div>
-                    <div class="kpi-sub">Avg Transaction Value</div>
+                    <div class="kpi-label">Bank Balance</div>
+                    <div class="kpi-value" id="kpi-bank">--</div>
+                    <div class="kpi-sub" id="kpi-bank-sub"></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">UPT</div>
-                    <div class="kpi-value" id="kpi-upt">--</div>
-                    <div class="kpi-sub">Units Per Transaction</div>
+                    <div class="kpi-label">Orders Placed</div>
+                    <div class="kpi-value" id="kpi-orders">--</div>
+                    <div class="kpi-sub">Amount</div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">ASP</div>
-                    <div class="kpi-value" id="kpi-asp">--</div>
-                    <div class="kpi-sub">Avg Selling Price</div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">CY MTD Sale</div>
-                    <div class="kpi-value" id="kpi-mtd">--</div>
-                    <div class="kpi-sub" id="kpi-mtd-sub"></div>
+                    <div class="kpi-label">Total Expenses</div>
+                    <div class="kpi-value" id="kpi-expenses">--</div>
+                    <div class="kpi-sub" id="kpi-expenses-sub"></div>
                 </div>
             </div>
 
@@ -232,13 +233,13 @@
                         <thead>
                             <tr>
                                 <th>Month</th>
-                                <th>Total Sale</th>
+                                <th>Total Sales</th>
                                 <th>Avg Daily Sale</th>
                                 <th>Total Bills</th>
-                                <th>Avg ATV</th>
-                                <th>Avg UPT</th>
-                                <th>Target</th>
-                                <th>Achievement</th>
+                                <th>Total Returns</th>
+                                <th>Net Sales</th>
+                                <th>Total Expenses</th>
+                                <th>Avg Bank Bal.</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -261,19 +262,17 @@
                         <thead>
                             <tr>
                                 <th>Date</th>
-                                <th>Open</th>
-                                <th>Close</th>
-                                <th>Sale</th>
+                                <th>Sales</th>
                                 <th>Bills</th>
-                                <th>QTY</th>
-                                <th>ATV</th>
-                                <th>UPT</th>
-                                <th>ASP</th>
-                                <th>CY MTD</th>
-                                <th>MTD Avg</th>
-                                <th>Trend</th>
-                                <th>Target</th>
-                                <th>Ach%</th>
+                                <th>Returns</th>
+                                <th>Net Sales</th>
+                                <th>Closing Stock</th>
+                                <th>Bank Balance</th>
+                                <th>Orders Placed</th>
+                                <th>Salary</th>
+                                <th>Electricity</th>
+                                <th>Admin Exp.</th>
+                                <th>Total Exp.</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>

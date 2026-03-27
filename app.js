@@ -3,58 +3,52 @@ const SUPABASE_URL = 'https://zovnmmdfthpbubrorsgh.supabase.co';
 const SUPABASE_KEY = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inpvdm5tbWRmdGhwYnVicm9yc2doIiwicm9sZSI6ImFub24iLCJpYXQiOjE3NjE1NzE3ODgsImV4cCI6MjA3NzE0Nzc4OH0.92BH2sjUOgkw6iSRj1_4gt0p3eThg3QT4VK-Q4EdmBE';
 const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 
-// ==================== DATA STORE (Supabase-backed) ====================
+// ==================== DATA STORE ====================
 let appData = [];
+let consolidatedData = [];
 
 async function fetchData() {
-    const { data, error } = await db
-        .from('daily_sales')
-        .select('*')
-        .order('date', { ascending: true });
+    const [dailyRes, consolidatedRes] = await Promise.all([
+        db.from('daily_sales').select('*').order('date', { ascending: true }),
+        db.from('monthly_consolidated').select('*').order('month', { ascending: true })
+    ]);
 
-    if (error) {
-        console.error('Error fetching data:', error);
-        return [];
+    if (dailyRes.error) {
+        console.error('Error fetching daily:', dailyRes.error);
+    } else {
+        appData = dailyRes.data.map(row => {
+            const sales = Number(row.sales) || 0;
+            const bills = Number(row.no_of_bills) || 0;
+            return {
+                id: row.id,
+                date: row.date,
+                sale: sales,
+                bills: bills,
+                salesReturns: Number(row.sales_returns) || 0,
+                netSales: Number(row.net_sales) || 0,
+                closingStock: Number(row.closing_stock) || 0,
+                bankBalance: Number(row.bank_balance) || 0,
+                ordersPlaced: Number(row.orders_placed_amount) || 0,
+                salaryPaid: Number(row.salary_paid) || 0,
+                electricityPaid: Number(row.electricity_paid) || 0,
+                adminExpenses: Number(row.admin_expenses) || 0,
+                totalExpenses: Number(row.total_expenses) || 0
+            };
+        });
     }
 
-    // Map Supabase columns to the app's expected format
-    appData = data.map(row => {
-        const sales = Number(row.sales) || 0;
-        const bills = Number(row.no_of_bills) || 0;
-        const qty = Number(row.quantity) || 0;
-        const netSales = Number(row.net_sales) || 0;
-        // Strip seconds from time if present (e.g. "09:30:00" -> "09:30")
-        const openTime = (row.open_time || '09:30').substring(0, 5);
-        const closeTime = (row.close_time || '21:30').substring(0, 5);
-
-        return {
-            id: row.id,
-            date: row.date,
-            openTime,
-            closeTime,
-            sale: sales,
-            bills: bills,
-            qty: qty,
-            atv: Number(row.atv) || (bills > 0 ? sales / bills : 0),
-            upt: Number(row.upt) || 0,
-            asp: Number(row.asp) || 0,
-            cymtd: Number(row.cy_mtd_sale) || 0,
-            cymtdAvg: Number(row.cy_mtd_avg_sale) || 0,
-            trend: Number(row.sales_trend) || 0,
-            target: Number(row.target) || 0,
-            tarAch: Number(row.target_achievement) || 0,
-            // Extra fields from Excel
-            salesReturns: Number(row.sales_returns) || 0,
-            netSales: netSales,
-            closingStock: Number(row.closing_stock) || 0,
-            bankBalance: Number(row.bank_balance) || 0,
-            ordersPlaced: Number(row.orders_placed_amount) || 0,
-            salaryPaid: Number(row.salary_paid) || 0,
-            electricityPaid: Number(row.electricity_paid) || 0,
-            adminExpenses: Number(row.admin_expenses) || 0,
-            totalExpenses: Number(row.total_expenses) || 0
-        };
-    });
+    if (consolidatedRes.error) {
+        console.error('Error fetching consolidated:', consolidatedRes.error);
+    } else {
+        consolidatedData = consolidatedRes.data.map(row => ({
+            month: row.month,
+            days: Number(row.no_of_days) || 0,
+            sales: Number(row.sales) || 0,
+            salesReturn: Number(row.sales_return) || 0,
+            netSales: Number(row.net_sales) || 0,
+            avgSales: Number(row.avg_sales_monthly) || 0
+        }));
+    }
 
     return appData;
 }
@@ -66,23 +60,20 @@ function getData() {
 async function saveToSupabase(entry) {
     const row = {
         date: entry.date,
-        open_time: entry.openTime,
-        close_time: entry.closeTime,
         sales: entry.sale,
         no_of_bills: entry.bills,
-        quantity: entry.qty,
-        atv: entry.atv,
-        upt: entry.upt,
-        asp: entry.asp,
-        cy_mtd_sale: entry.cymtd,
-        cy_mtd_avg_sale: entry.cymtdAvg,
-        sales_trend: entry.trend,
-        target: entry.target,
-        target_achievement: entry.tarAch,
-        net_sales: entry.sale - (entry.salesReturns || 0)
+        sales_returns: entry.salesReturns,
+        net_sales: entry.netSales,
+        closing_stock: entry.closingStock,
+        bank_balance: entry.bankBalance,
+        orders_placed_amount: entry.ordersPlaced,
+        salary_paid: entry.salaryPaid,
+        electricity_paid: entry.electricityPaid,
+        admin_expenses: entry.adminExpenses,
+        total_expenses: entry.totalExpenses
     };
 
-    const { data, error } = await db
+    const { error } = await db
         .from('daily_sales')
         .upsert(row, { onConflict: 'date' })
         .select();
@@ -107,6 +98,22 @@ async function deleteFromSupabase(date) {
     return true;
 }
 
+// ==================== LOADING ====================
+function showLoading() {
+    document.getElementById('loadingOverlay').classList.add('visible');
+}
+
+function hideLoading() {
+    document.getElementById('loadingOverlay').classList.remove('visible');
+}
+
+async function refreshData() {
+    showLoading();
+    await fetchData();
+    renderDashboard();
+    hideLoading();
+}
+
 // ==================== NAVIGATION ====================
 const navLinks = document.querySelectorAll('.nav-links li');
 const pages = document.querySelectorAll('.page');
@@ -116,7 +123,7 @@ const pageTitles = {
     dashboard: 'Dashboard',
     entry: 'Data Entry',
     sales: 'Sales Analysis',
-    target: 'Target vs Achievement',
+    consolidated: 'Monthly Overview',
     records: 'All Records'
 };
 
@@ -129,15 +136,13 @@ navLinks.forEach(link => {
         document.getElementById('page-' + page).classList.add('active');
         pageTitle.textContent = pageTitles[page];
 
-        // Close sidebar on mobile
         if (window.innerWidth <= 768) {
             document.getElementById('sidebar').classList.remove('open');
         }
 
-        // Refresh charts when navigating
         if (page === 'dashboard') renderDashboard();
         if (page === 'sales') renderSalesCharts();
-        if (page === 'target') renderTargetCharts();
+        if (page === 'consolidated') renderConsolidatedPage();
         if (page === 'records') renderRecordsTable();
     });
 });
@@ -156,30 +161,27 @@ document.getElementById('current-date').textContent = new Date().toLocaleDateStr
 document.getElementById('f-date').valueAsDate = new Date();
 
 // ==================== FORM AUTO-CALC ====================
-const fSale = document.getElementById('f-sale');
+const fSales = document.getElementById('f-sales');
 const fBills = document.getElementById('f-bills');
-const fQty = document.getElementById('f-qty');
-const fAtv = document.getElementById('f-atv');
-const fUpt = document.getElementById('f-upt');
-const fAsp = document.getElementById('f-asp');
-const fCymtd = document.getElementById('f-cymtd');
-const fTarget = document.getElementById('f-target');
-const fTarAch = document.getElementById('f-tarach');
+const fReturns = document.getElementById('f-returns');
+const fNetSales = document.getElementById('f-netsales');
+const fSalary = document.getElementById('f-salary');
+const fElectricity = document.getElementById('f-electricity');
+const fAdmin = document.getElementById('f-admin');
+const fTotalExp = document.getElementById('f-totalexp');
 
 function autoCalc() {
-    const sale = parseFloat(fSale.value) || 0;
-    const bills = parseFloat(fBills.value) || 0;
-    const qty = parseFloat(fQty.value) || 0;
-    const cymtd = parseFloat(fCymtd.value) || 0;
-    const target = parseFloat(fTarget.value) || 0;
+    const sales = parseFloat(fSales.value) || 0;
+    const returns = parseFloat(fReturns.value) || 0;
+    const salary = parseFloat(fSalary.value) || 0;
+    const electricity = parseFloat(fElectricity.value) || 0;
+    const admin = parseFloat(fAdmin.value) || 0;
 
-    fAtv.value = bills > 0 ? (sale / bills).toFixed(2) : '';
-    fUpt.value = bills > 0 ? (qty / bills).toFixed(2) : '';
-    fAsp.value = qty > 0 ? (sale / qty).toFixed(2) : '';
-    fTarAch.value = target > 0 ? ((cymtd / target) * 100).toFixed(2) : '';
+    fNetSales.value = (sales - returns).toFixed(2);
+    fTotalExp.value = (salary + electricity + admin).toFixed(2);
 }
 
-[fSale, fBills, fQty, fCymtd, fTarget].forEach(el => {
+[fSales, fReturns, fSalary, fElectricity, fAdmin].forEach(el => {
     el.addEventListener('input', autoCalc);
 });
 
@@ -189,41 +191,46 @@ let editingDate = null;
 async function saveEntry(e) {
     e.preventDefault();
 
+    const sales = parseFloat(fSales.value) || 0;
+    const returns = parseFloat(fReturns.value) || 0;
+    const salary = parseFloat(fSalary.value) || 0;
+    const electricity = parseFloat(fElectricity.value) || 0;
+    const admin = parseFloat(fAdmin.value) || 0;
+
     const entry = {
         date: document.getElementById('f-date').value,
-        openTime: document.getElementById('f-open').value,
-        closeTime: document.getElementById('f-close').value,
-        sale: parseFloat(fSale.value),
-        bills: parseInt(fBills.value),
-        qty: parseInt(fQty.value),
-        atv: parseFloat(fAtv.value),
-        upt: parseFloat(fUpt.value),
-        asp: parseFloat(fAsp.value),
-        cymtd: parseFloat(fCymtd.value),
-        cymtdAvg: parseFloat(document.getElementById('f-cymtdavg').value),
-        trend: parseFloat(document.getElementById('f-trend').value),
-        target: parseFloat(fTarget.value),
-        tarAch: parseFloat(fTarAch.value)
+        sale: sales,
+        bills: parseInt(fBills.value) || 0,
+        salesReturns: returns,
+        netSales: sales - returns,
+        closingStock: parseFloat(document.getElementById('f-stock').value) || 0,
+        bankBalance: parseFloat(document.getElementById('f-bank').value) || 0,
+        ordersPlaced: parseFloat(document.getElementById('f-orders').value) || 0,
+        salaryPaid: salary,
+        electricityPaid: electricity,
+        adminExpenses: admin,
+        totalExpenses: salary + electricity + admin
     };
 
     if (!editingDate) {
-        // Check for duplicate date
         if (appData.some(d => d.date === entry.date)) {
             showMessage('Entry for this date already exists. Use edit from Records page.', 'error');
             return false;
         }
     }
 
+    showLoading();
     const success = await saveToSupabase(entry);
     if (success) {
         showMessage('Entry saved to Supabase!', 'success');
         editingDate = null;
         document.getElementById('submitBtn').textContent = 'Save Entry';
         resetForm();
-        await fetchData(); // Refresh local data
+        await fetchData();
     } else {
         showMessage('Error saving entry. Check console.', 'error');
     }
+    hideLoading();
 
     return false;
 }
@@ -231,8 +238,11 @@ async function saveEntry(e) {
 function resetForm() {
     document.getElementById('entryForm').reset();
     document.getElementById('f-date').valueAsDate = new Date();
-    document.getElementById('f-open').value = '09:30';
-    document.getElementById('f-close').value = '21:30';
+    document.getElementById('f-returns').value = '0';
+    document.getElementById('f-orders').value = '0';
+    document.getElementById('f-salary').value = '0';
+    document.getElementById('f-electricity').value = '0';
+    document.getElementById('f-admin').value = '0';
     editingDate = null;
     document.getElementById('submitBtn').textContent = 'Save Entry';
 }
@@ -245,28 +255,24 @@ function showMessage(text, type) {
 }
 
 function editEntry(date) {
-    const data = getData();
-    const entry = data.find(d => d.date === date);
+    const entry = appData.find(d => d.date === date);
     if (!entry) return;
 
     editingDate = date;
     document.getElementById('f-date').value = entry.date;
-    document.getElementById('f-open').value = entry.openTime;
-    document.getElementById('f-close').value = entry.closeTime;
-    fSale.value = entry.sale;
+    fSales.value = entry.sale;
     fBills.value = entry.bills;
-    fQty.value = entry.qty;
-    fAtv.value = entry.atv;
-    fUpt.value = entry.upt;
-    fAsp.value = entry.asp;
-    fCymtd.value = entry.cymtd;
-    document.getElementById('f-cymtdavg').value = entry.cymtdAvg;
-    document.getElementById('f-trend').value = entry.trend;
-    fTarget.value = entry.target;
-    fTarAch.value = entry.tarAch;
+    fReturns.value = entry.salesReturns;
+    fNetSales.value = entry.netSales;
+    document.getElementById('f-stock').value = entry.closingStock;
+    document.getElementById('f-bank').value = entry.bankBalance;
+    document.getElementById('f-orders').value = entry.ordersPlaced;
+    fSalary.value = entry.salaryPaid;
+    fElectricity.value = entry.electricityPaid;
+    fAdmin.value = entry.adminExpenses;
+    fTotalExp.value = entry.totalExpenses;
     document.getElementById('submitBtn').textContent = 'Update Entry';
 
-    // Navigate to entry page
     navLinks.forEach(l => l.classList.remove('active'));
     document.querySelector('[data-page="entry"]').classList.add('active');
     pages.forEach(p => p.classList.remove('active'));
@@ -276,11 +282,13 @@ function editEntry(date) {
 
 async function deleteEntry(date) {
     if (!confirm('Delete entry for ' + date + '?')) return;
+    showLoading();
     const success = await deleteFromSupabase(date);
     if (success) {
         await fetchData();
         renderRecordsTable();
     }
+    hideLoading();
 }
 
 // ==================== FORMATTING ====================
@@ -294,27 +302,31 @@ function fmtCurrency(n) {
     return '\u20B9' + new Intl.NumberFormat('en-IN').format(Math.round(n));
 }
 
-function formatTime(t) {
-    if (!t) return '--';
-    const parts = t.split(':');
-    const hr = parseInt(parts[0]);
-    const m = parts[1];
-    const ampm = hr >= 12 ? 'PM' : 'AM';
-    const hr12 = hr % 12 || 12;
-    return hr12 + ':' + m + ' ' + ampm;
+function fmtLakhs(n) {
+    if (n === undefined || n === null || isNaN(n)) return '--';
+    return '\u20B9' + (n / 100000).toFixed(2) + 'L';
 }
 
-function achClass(val) {
-    if (val >= 80) return 'ach-high';
-    if (val >= 50) return 'ach-mid';
-    return 'ach-low';
+function formatMonth(dateStr) {
+    const dt = new Date(dateStr);
+    return dt.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
 }
 
 // ==================== DASHBOARD ====================
-let dashSalesChart, dashTargetChart;
+let dashSalesChart, dashBankChart;
 
 function renderDashboard() {
     const data = getData();
+
+    // Date range bar
+    if (data.length > 0) {
+        const first = new Date(data[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
+        const last = new Date(data[data.length - 1].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
+        document.getElementById('dateRangeBar').textContent = 'Showing ' + data.length + ' records: ' + first + ' \u2013 ' + last;
+    } else {
+        document.getElementById('dateRangeBar').textContent = 'No data loaded';
+    }
+
     const latest = data.length > 0 ? data[data.length - 1] : null;
 
     if (!latest) {
@@ -324,47 +336,76 @@ function renderDashboard() {
         return;
     }
 
-    // Get previous day for comparison
     const prev = data.length > 1 ? data[data.length - 2] : null;
 
     document.getElementById('kpi-sale').textContent = fmtCurrency(latest.sale);
     document.getElementById('kpi-netsales').textContent = fmtCurrency(latest.netSales);
     document.getElementById('kpi-bills').textContent = fmt(latest.bills);
     document.getElementById('kpi-returns').textContent = fmtCurrency(latest.salesReturns);
-    document.getElementById('kpi-stock').textContent = fmtCurrency(latest.closingStock);
+    document.getElementById('kpi-stock').textContent = fmtLakhs(latest.closingStock);
     document.getElementById('kpi-bank').textContent = fmtCurrency(latest.bankBalance);
     document.getElementById('kpi-orders').textContent = fmtCurrency(latest.ordersPlaced);
     document.getElementById('kpi-expenses').textContent = fmtCurrency(latest.totalExpenses);
 
-    // Comparison subs
     if (prev) {
-        setSub('kpi-sale-sub', latest.sale, prev.sale, true);
-        setSub('kpi-netsales-sub', latest.netSales, prev.netSales, true);
-        setSub('kpi-bills-sub', latest.bills, prev.bills, false);
-        setSub('kpi-returns-sub', latest.salesReturns, prev.salesReturns, false);
-        setSub('kpi-stock-sub', latest.closingStock, prev.closingStock, true);
-        setSub('kpi-bank-sub', latest.bankBalance, prev.bankBalance, true);
+        setSub('kpi-sale-sub', latest.sale, prev.sale);
+        setSub('kpi-netsales-sub', latest.netSales, prev.netSales);
+        setSub('kpi-bills-sub', latest.bills, prev.bills);
+        setSub('kpi-returns-sub', latest.salesReturns, prev.salesReturns);
+        setSub('kpi-stock-sub', latest.closingStock, prev.closingStock);
+        setSub('kpi-bank-sub', latest.bankBalance, prev.bankBalance);
     }
 
-    document.getElementById('kpi-expenses-sub').textContent = 'Salary + Electricity + Admin';
+    // Orders — show month total
+    const currentMonth = latest.date.substring(0, 7);
+    const monthOrders = data.filter(d => d.date.startsWith(currentMonth)).reduce((s, d) => s + d.ordersPlaced, 0);
+    document.getElementById('kpi-orders-sub').textContent = 'Month total: ' + fmtCurrency(monthOrders);
+
+    // Expenses — show month total
+    const monthExpenses = data.filter(d => d.date.startsWith(currentMonth)).reduce((s, d) => s + d.totalExpenses, 0);
+    document.getElementById('kpi-expenses-sub').textContent = 'Month total: ' + fmtCurrency(monthExpenses);
 
     // Sales trend chart
-    const last30 = data.slice(-30);
-    const labels = last30.map(d => {
+    const labels = data.map(d => {
         const dt = new Date(d.date);
         return dt.getDate() + '/' + (dt.getMonth() + 1);
     });
 
     if (dashSalesChart) dashSalesChart.destroy();
     dashSalesChart = new Chart(document.getElementById('dashSalesChart'), {
-        type: 'line',
+        type: 'bar',
         data: {
             labels,
             datasets: [{
                 label: 'Daily Sale',
-                data: last30.map(d => d.sale),
-                borderColor: '#e94560',
-                backgroundColor: 'rgba(233,69,96,0.1)',
+                data: data.map(d => d.sale),
+                backgroundColor: data.map(d => d.sale > 100000 ? 'rgba(46,204,113,0.7)' : 'rgba(233,69,96,0.7)'),
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: {
+                y: {
+                    beginAtZero: true,
+                    ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' }
+                }
+            }
+        }
+    });
+
+    // Bank balance trend
+    if (dashBankChart) dashBankChart.destroy();
+    dashBankChart = new Chart(document.getElementById('dashBankChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Bank Balance',
+                data: data.map(d => d.bankBalance),
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52,152,219,0.1)',
                 fill: true,
                 tension: 0.3,
                 pointRadius: 3,
@@ -376,52 +417,28 @@ function renderDashboard() {
             plugins: { legend: { display: false } },
             scales: {
                 y: {
-                    beginAtZero: false,
-                    ticks: {
-                        callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K'
-                    }
+                    ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' }
                 }
             }
         }
     });
-
-    // Target doughnut
-    if (dashTargetChart) dashTargetChart.destroy();
-    const ach = latest.tarAch;
-    dashTargetChart = new Chart(document.getElementById('dashTargetChart'), {
-        type: 'doughnut',
-        data: {
-            labels: ['Achieved', 'Remaining'],
-            datasets: [{
-                data: [Math.min(ach, 100), Math.max(100 - ach, 0)],
-                backgroundColor: [ach >= 80 ? '#2ecc71' : ach >= 50 ? '#f39c12' : '#e74c3c', '#e0e0e0'],
-                borderWidth: 0
-            }]
-        },
-        options: {
-            responsive: true,
-            cutout: '75%',
-            plugins: {
-                legend: { position: 'bottom', labels: { font: { size: 12 } } }
-            }
-        }
-    });
 }
 
-function setSub(id, current, previous, isCurrency) {
+function setSub(id, current, previous) {
     const el = document.getElementById(id);
+    if (!el) return;
     const diff = current - previous;
     const pct = previous ? ((diff / previous) * 100).toFixed(1) : 0;
     const arrow = diff >= 0 ? '\u25B2' : '\u25BC';
-    el.textContent = arrow + ' ' + Math.abs(pct) + '% vs yesterday';
+    el.textContent = arrow + ' ' + Math.abs(pct) + '% vs prev day';
     el.className = 'kpi-sub ' + (diff >= 0 ? 'up' : 'down');
 }
 
 // ==================== SALES ANALYSIS CHARTS ====================
-let salesLineChart, billsQtyChart, atvChart, uptChart, aspChart;
+let grossNetChart, returnsChart, stockChart, bankChart, expensesChart;
 
 function renderSalesCharts() {
-    const data = getData().slice(-30);
+    const data = getData();
     if (data.length === 0) return;
 
     const labels = data.map(d => {
@@ -429,49 +446,63 @@ function renderSalesCharts() {
         return dt.getDate() + '/' + (dt.getMonth() + 1);
     });
 
-    // Sales Line
-    if (salesLineChart) salesLineChart.destroy();
-    salesLineChart = new Chart(document.getElementById('salesLineChart'), {
+    // Gross vs Net Sales
+    if (grossNetChart) grossNetChart.destroy();
+    grossNetChart = new Chart(document.getElementById('grossNetChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                {
+                    label: 'Gross Sales',
+                    data: data.map(d => d.sale),
+                    backgroundColor: 'rgba(52,152,219,0.7)',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Net Sales',
+                    data: data.map(d => d.netSales),
+                    backgroundColor: 'rgba(46,204,113,0.7)',
+                    borderRadius: 4
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+        }
+    });
+
+    // Sales Returns
+    if (returnsChart) returnsChart.destroy();
+    returnsChart = new Chart(document.getElementById('returnsChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [{
-                label: 'Daily Sale',
-                data: data.map(d => d.sale),
-                backgroundColor: 'rgba(233,69,96,0.7)',
+                label: 'Returns',
+                data: data.map(d => d.salesReturns),
+                backgroundColor: data.map(d => d.salesReturns > 5000 ? 'rgba(231,76,60,0.8)' : 'rgba(243,156,18,0.6)'),
                 borderRadius: 4
             }]
         },
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(1) + 'K' } } }
         }
     });
 
-    // Bills vs QTY
-    if (billsQtyChart) billsQtyChart.destroy();
-    billsQtyChart = new Chart(document.getElementById('billsQtyChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                { label: 'Bills', data: data.map(d => d.bills), borderColor: '#3498db', tension: 0.3, pointRadius: 2 },
-                { label: 'Quantity', data: data.map(d => d.qty), borderColor: '#2ecc71', tension: 0.3, pointRadius: 2 }
-            ]
-        },
-        options: { responsive: true, plugins: { legend: { position: 'bottom' } } }
-    });
-
-    // ATV
-    if (atvChart) atvChart.destroy();
-    atvChart = new Chart(document.getElementById('atvChart'), {
+    // Closing Stock
+    if (stockChart) stockChart.destroy();
+    stockChart = new Chart(document.getElementById('stockChart'), {
         type: 'line',
         data: {
             labels,
             datasets: [{
-                label: 'ATV',
-                data: data.map(d => d.atv),
+                label: 'Closing Stock',
+                data: data.map(d => d.closingStock),
                 borderColor: '#9b59b6',
                 backgroundColor: 'rgba(155,89,182,0.1)',
                 fill: true,
@@ -482,40 +513,21 @@ function renderSalesCharts() {
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + v } } }
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 100000).toFixed(1) + 'L' } } }
         }
     });
 
-    // UPT
-    if (uptChart) uptChart.destroy();
-    uptChart = new Chart(document.getElementById('uptChart'), {
+    // Bank Balance
+    if (bankChart) bankChart.destroy();
+    bankChart = new Chart(document.getElementById('bankChart'), {
         type: 'line',
         data: {
             labels,
             datasets: [{
-                label: 'UPT',
-                data: data.map(d => d.upt),
-                borderColor: '#e67e22',
-                backgroundColor: 'rgba(230,126,34,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2
-            }]
-        },
-        options: { responsive: true, plugins: { legend: { display: false } } }
-    });
-
-    // ASP
-    if (aspChart) aspChart.destroy();
-    aspChart = new Chart(document.getElementById('aspChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'ASP',
-                data: data.map(d => d.asp),
-                borderColor: '#1abc9c',
-                backgroundColor: 'rgba(26,188,156,0.1)',
+                label: 'Bank Balance',
+                data: data.map(d => d.bankBalance),
+                borderColor: '#3498db',
+                backgroundColor: 'rgba(52,152,219,0.1)',
                 fill: true,
                 tension: 0.3,
                 pointRadius: 2
@@ -524,41 +536,89 @@ function renderSalesCharts() {
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + v } } }
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+        }
+    });
+
+    // Expenses stacked bar
+    if (expensesChart) expensesChart.destroy();
+    const daysWithExpenses = data.filter(d => d.totalExpenses > 0);
+    const expLabels = daysWithExpenses.map(d => {
+        const dt = new Date(d.date);
+        return dt.getDate() + '/' + (dt.getMonth() + 1);
+    });
+    expensesChart = new Chart(document.getElementById('expensesChart'), {
+        type: 'bar',
+        data: {
+            labels: expLabels,
+            datasets: [
+                {
+                    label: 'Salary',
+                    data: daysWithExpenses.map(d => d.salaryPaid),
+                    backgroundColor: 'rgba(231,76,60,0.7)',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Electricity',
+                    data: daysWithExpenses.map(d => d.electricityPaid),
+                    backgroundColor: 'rgba(243,156,18,0.7)',
+                    borderRadius: 2
+                },
+                {
+                    label: 'Admin',
+                    data: daysWithExpenses.map(d => d.adminExpenses),
+                    backgroundColor: 'rgba(155,89,182,0.7)',
+                    borderRadius: 2
+                }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } }
+            }
         }
     });
 }
 
-// ==================== TARGET CHARTS ====================
-let targetBarChart, achRateChart, trendProjectionChart;
+// ==================== CONSOLIDATED / MONTHLY OVERVIEW ====================
+let monthlyBarChart, monthlyAvgChart;
 
-function renderTargetCharts() {
-    const data = getData();
-    if (data.length === 0) return;
+function renderConsolidatedPage() {
+    renderConsolidatedCharts();
+    renderMonthlySummary();
+    renderConsolidatedTable();
+}
 
-    const last30 = data.slice(-30);
-    const labels = last30.map(d => {
-        const dt = new Date(d.date);
-        return dt.getDate() + '/' + (dt.getMonth() + 1);
-    });
+function renderConsolidatedCharts() {
+    if (consolidatedData.length === 0) return;
 
-    // MTD vs Target bar
-    if (targetBarChart) targetBarChart.destroy();
-    targetBarChart = new Chart(document.getElementById('targetBarChart'), {
+    const labels = consolidatedData.map(d => formatMonth(d.month));
+
+    if (monthlyBarChart) monthlyBarChart.destroy();
+    monthlyBarChart = new Chart(document.getElementById('monthlyBarChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [
                 {
-                    label: 'CY MTD Sale',
-                    data: last30.map(d => d.cymtd),
+                    label: 'Gross Sales',
+                    data: consolidatedData.map(d => d.sales),
                     backgroundColor: 'rgba(52,152,219,0.7)',
                     borderRadius: 4
                 },
                 {
-                    label: 'Target',
-                    data: last30.map(d => d.target),
-                    backgroundColor: 'rgba(231,76,60,0.3)',
+                    label: 'Net Sales',
+                    data: consolidatedData.map(d => d.netSales),
+                    backgroundColor: 'rgba(46,204,113,0.7)',
+                    borderRadius: 4
+                },
+                {
+                    label: 'Returns',
+                    data: consolidatedData.map(d => d.salesReturn),
+                    backgroundColor: 'rgba(231,76,60,0.7)',
                     borderRadius: 4
                 }
             ]
@@ -570,68 +630,35 @@ function renderTargetCharts() {
         }
     });
 
-    // Achievement rate
-    if (achRateChart) achRateChart.destroy();
-    achRateChart = new Chart(document.getElementById('achRateChart'), {
+    if (monthlyAvgChart) monthlyAvgChart.destroy();
+    monthlyAvgChart = new Chart(document.getElementById('monthlyAvgChart'), {
         type: 'line',
         data: {
             labels,
             datasets: [{
-                label: 'Achievement %',
-                data: last30.map(d => d.tarAch),
+                label: 'Avg Daily Sale',
+                data: consolidatedData.map(d => d.avgSales),
                 borderColor: '#e94560',
                 backgroundColor: 'rgba(233,69,96,0.1)',
                 fill: true,
                 tension: 0.3,
-                pointRadius: 3
+                pointRadius: 4,
+                pointHoverRadius: 7
             }]
         },
         options: {
             responsive: true,
             plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, max: 100, ticks: { callback: v => v + '%' } } }
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
         }
     });
-
-    // Trend projection
-    if (trendProjectionChart) trendProjectionChart.destroy();
-    trendProjectionChart = new Chart(document.getElementById('trendProjectionChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [
-                {
-                    label: 'Sales Trend',
-                    data: last30.map(d => d.trend),
-                    borderColor: '#2ecc71',
-                    tension: 0.3,
-                    pointRadius: 2
-                },
-                {
-                    label: 'Target',
-                    data: last30.map(d => d.target),
-                    borderColor: '#e74c3c',
-                    borderDash: [5, 5],
-                    tension: 0,
-                    pointRadius: 0
-                }
-            ]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 100000).toFixed(1) + 'L' } } }
-        }
-    });
-
-    // Monthly summary
-    renderMonthlySummary(data);
 }
 
-function renderMonthlySummary(data) {
+function renderMonthlySummary() {
+    const data = getData();
     const months = {};
     data.forEach(d => {
-        const key = d.date.substring(0, 7); // YYYY-MM
+        const key = d.date.substring(0, 7);
         if (!months[key]) months[key] = [];
         months[key].push(d);
     });
@@ -658,10 +685,28 @@ function renderMonthlySummary(data) {
             <td>${fmtCurrency(totalSale)}</td>
             <td>${fmtCurrency(avgSale)}</td>
             <td>${fmt(totalBills)}</td>
-            <td>${fmtCurrency(totalReturns)}</td>
+            <td class="${totalReturns > 50000 ? 'text-danger' : ''}">${fmtCurrency(totalReturns)}</td>
             <td>${fmtCurrency(totalNetSales)}</td>
-            <td>${fmtCurrency(totalExpenses)}</td>
+            <td class="${totalExpenses > 200000 ? 'text-danger' : ''}">${fmtCurrency(totalExpenses)}</td>
             <td>${fmtCurrency(avgBank)}</td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function renderConsolidatedTable() {
+    const tbody = document.querySelector('#consolidatedTable tbody');
+    tbody.innerHTML = '';
+
+    consolidatedData.forEach(d => {
+        const tr = document.createElement('tr');
+        tr.innerHTML = `
+            <td>${formatMonth(d.month)}</td>
+            <td>${fmt(d.days)}</td>
+            <td>${fmtCurrency(d.sales)}</td>
+            <td class="${d.salesReturn > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.salesReturn)}</td>
+            <td>${fmtCurrency(d.netSales)}</td>
+            <td>${fmtCurrency(d.avgSales)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -673,7 +718,6 @@ function renderRecordsTable() {
     const tbody = document.querySelector('#recordsTable tbody');
     tbody.innerHTML = '';
 
-    // Populate month filter
     const monthFilter = document.getElementById('filterMonth');
     const currentVal = monthFilter.value;
     const months = [...new Set(data.map(d => d.date.substring(0, 7)))].sort().reverse();
@@ -686,10 +730,8 @@ function renderRecordsTable() {
 
     let filtered = data.slice().reverse();
 
-    // Apply filters
     const search = document.getElementById('searchRecords').value.toLowerCase();
     const monthVal = monthFilter.value;
-
     if (search) filtered = filtered.filter(d => d.date.includes(search));
     if (monthVal) filtered = filtered.filter(d => d.date.startsWith(monthVal));
 
@@ -699,15 +741,15 @@ function renderRecordsTable() {
             <td>${d.date}</td>
             <td>${fmtCurrency(d.sale)}</td>
             <td>${d.bills}</td>
-            <td>${fmtCurrency(d.salesReturns)}</td>
+            <td class="${d.salesReturns > 5000 ? 'text-danger' : ''}">${fmtCurrency(d.salesReturns)}</td>
             <td>${fmtCurrency(d.netSales)}</td>
-            <td>${fmtCurrency(d.closingStock)}</td>
+            <td>${fmtLakhs(d.closingStock)}</td>
             <td>${fmtCurrency(d.bankBalance)}</td>
             <td>${fmtCurrency(d.ordersPlaced)}</td>
             <td>${fmtCurrency(d.salaryPaid)}</td>
             <td>${fmtCurrency(d.electricityPaid)}</td>
             <td>${fmtCurrency(d.adminExpenses)}</td>
-            <td>${fmtCurrency(d.totalExpenses)}</td>
+            <td class="${d.totalExpenses > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.totalExpenses)}</td>
             <td>
                 <button class="btn-edit" onclick="editEntry('${d.date}')">Edit</button>
                 <button class="btn-delete" onclick="deleteEntry('${d.date}')">Del</button>
@@ -729,10 +771,11 @@ function exportData() {
         return;
     }
 
-    const headers = ['Date', 'Open Time', 'Close Time', 'Sale', 'Bills', 'QTY', 'ATV', 'UPT', 'ASP', 'CY MTD Sale', 'CY MTD Avg Sale', 'Sales Trend', 'Target', 'Target vs Ach %'];
+    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
     const rows = data.map(d => [
-        d.date, d.openTime, d.closeTime, d.sale, d.bills, d.qty,
-        d.atv, d.upt, d.asp, d.cymtd, d.cymtdAvg, d.trend, d.target, d.tarAch
+        d.date, d.sale, d.bills, d.salesReturns, d.netSales,
+        d.closingStock, d.bankBalance, d.ordersPlaced,
+        d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses
     ]);
 
     let csv = headers.join(',') + '\n';
@@ -749,9 +792,11 @@ function exportData() {
 
 // ==================== INIT ====================
 async function init() {
+    showLoading();
     await fetchData();
     renderDashboard();
-    console.log('Supabase connected. Loaded ' + appData.length + ' records.');
+    hideLoading();
+    console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly records.');
 }
 
 init();

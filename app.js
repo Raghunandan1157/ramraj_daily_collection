@@ -34,8 +34,7 @@ async function fetchData() {
                 salaryPaid: Number(row.salary_paid) || 0,
                 electricityPaid: Number(row.electricity_paid) || 0,
                 adminExpenses: Number(row.admin_expenses) || 0,
-                totalExpenses: Number(row.total_expenses) || 0,
-                utspl: Number(row.utspl) || 0
+                totalExpenses: Number(row.total_expenses) || 0
             };
         });
     }
@@ -84,8 +83,7 @@ async function saveToSupabase(entry) {
         salary_paid: entry.salaryPaid,
         electricity_paid: entry.electricityPaid,
         admin_expenses: entry.adminExpenses,
-        total_expenses: entry.totalExpenses,
-        utspl: entry.utspl
+        total_expenses: entry.totalExpenses
     };
 
     const { error } = await db
@@ -225,8 +223,7 @@ async function saveEntry(e) {
         salaryPaid: salary,
         electricityPaid: electricity,
         adminExpenses: admin,
-        totalExpenses: salary + electricity + admin,
-        utspl: parseFloat(document.getElementById('f-utspl').value) || 0
+        totalExpenses: salary + electricity + admin
     };
 
     if (!editingDate) {
@@ -260,7 +257,6 @@ function resetForm() {
     document.getElementById('f-salary').value = '0';
     document.getElementById('f-electricity').value = '0';
     document.getElementById('f-admin').value = '0';
-    document.getElementById('f-utspl').value = '0';
     editingDate = null;
     document.getElementById('submitBtn').textContent = 'Save Entry';
 }
@@ -289,7 +285,6 @@ function editEntry(date) {
     fElectricity.value = entry.electricityPaid;
     fAdmin.value = entry.adminExpenses;
     fTotalExp.value = entry.totalExpenses;
-    document.getElementById('f-utspl').value = entry.utspl;
     document.getElementById('submitBtn').textContent = 'Update Entry';
 
     navLinks.forEach(l => l.classList.remove('active'));
@@ -840,7 +835,6 @@ function renderRecordsTable() {
             <td>${fmtCurrency(d.electricityPaid)}</td>
             <td>${fmtCurrency(d.adminExpenses)}</td>
             <td class="${d.totalExpenses > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.totalExpenses)}</td>
-            <td>${d.utspl ? fmtCurrency(d.utspl) : '--'}</td>
             <td>
                 <button class="btn-edit" onclick="editEntry('${d.date}')">Edit</button>
                 <button class="btn-delete" onclick="deleteEntry('${d.date}')">Del</button>
@@ -862,11 +856,11 @@ function exportData() {
         return;
     }
 
-    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses', 'UTSPL'];
+    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
     const rows = data.map(d => [
         d.date, d.sale, d.bills, d.salesReturns, d.netSales,
         d.closingStock, d.bankBalance, d.ordersPlaced,
-        d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses, d.utspl
+        d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses
     ]);
 
     let csv = headers.join(',') + '\n';

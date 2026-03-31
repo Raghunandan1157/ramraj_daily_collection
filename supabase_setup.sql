@@ -17,7 +17,6 @@ CREATE TABLE IF NOT EXISTS daily_sales (
     electricity_paid NUMERIC(12,2) DEFAULT 0,
     admin_expenses NUMERIC(12,2) DEFAULT 0,
     total_expenses NUMERIC(12,2) DEFAULT 0,
-    utspl NUMERIC(14,2) DEFAULT 0,
     -- Website-specific fields
     open_time TIME DEFAULT '09:30',
     close_time TIME DEFAULT '21:30',
@@ -89,5 +88,3 @@ ALTER TABLE internal_transactions ENABLE ROW LEVEL SECURITY;
 CREATE POLICY "Allow all access to internal_transactions" ON internal_transactions
     FOR ALL USING (true) WITH CHECK (true);
 
--- 7. Add utspl column to existing daily_sales table (run if table already exists)
--- ALTER TABLE daily_sales ADD COLUMN IF NOT EXISTS utspl NUMERIC(14,2) DEFAULT 0;

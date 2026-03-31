@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS daily_sales (
     electricity_paid NUMERIC(12,2) DEFAULT 0,
     admin_expenses NUMERIC(12,2) DEFAULT 0,
     total_expenses NUMERIC(12,2) DEFAULT 0,
+    utspl NUMERIC(14,2) DEFAULT 0,
     -- Website-specific fields
     open_time TIME DEFAULT '09:30',
     close_time TIME DEFAULT '21:30',
@@ -73,3 +74,20 @@ CREATE TRIGGER daily_sales_updated_at
 CREATE TRIGGER monthly_consolidated_updated_at
     BEFORE UPDATE ON monthly_consolidated
     FOR EACH ROW EXECUTE FUNCTION update_updated_at();
+
+-- 6. Internal Transactions Table
+CREATE TABLE IF NOT EXISTS internal_transactions (
+    id BIGINT GENERATED ALWAYS AS IDENTITY PRIMARY KEY,
+    date DATE NOT NULL,
+    amount NUMERIC(14,2) NOT NULL,
+    direction VARCHAR(3) NOT NULL CHECK (direction IN ('IN', 'OUT')),
+    created_at TIMESTAMPTZ DEFAULT NOW()
+);
+
+ALTER TABLE internal_transactions ENABLE ROW LEVEL SECURITY;
+
+CREATE POLICY "Allow all access to internal_transactions" ON internal_transactions
+    FOR ALL USING (true) WITH CHECK (true);
+
+-- 7. Add utspl column to existing daily_sales table (run if table already exists)
+-- ALTER TABLE daily_sales ADD COLUMN IF NOT EXISTS utspl NUMERIC(14,2) DEFAULT 0;

@@ -169,6 +169,10 @@
                             <label for="f-totalexp">Total Expenses (&#8377;)</label>
                             <input type="number" step="0.01" id="f-totalexp" placeholder="Auto-calculated" readonly>
                         </div>
+                        <div class="form-group">
+                            <label for="f-utspl">UTSPL (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-utspl" placeholder="e.g. 50000" value="0">
+                        </div>
                     </div>
                     <div class="form-actions">
                         <button type="submit" class="btn-primary" id="submitBtn">Save Entry</button>
@@ -177,6 +181,53 @@
                 </form>
             </div>
             <div id="entry-message" class="message hidden"></div>
+
+            <!-- Internal Transactions -->
+            <div class="form-card" style="margin-top: 24px;">
+                <h2>Internal Transaction</h2>
+                <form id="internalTxForm" onsubmit="return saveInternalTx(event)">
+                    <div class="form-grid">
+                        <div class="form-group">
+                            <label for="it-date">Date</label>
+                            <input type="date" id="it-date" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="it-amount">Amount (&#8377;)</label>
+                            <input type="number" step="0.01" id="it-amount" placeholder="e.g. 50000" required>
+                        </div>
+                        <div class="form-group">
+                            <label for="it-direction">Direction</label>
+                            <select id="it-direction" required>
+                                <option value="">Select...</option>
+                                <option value="IN">Money IN (Bank Credited)</option>
+                                <option value="OUT">Money OUT (Bank Debited)</option>
+                            </select>
+                        </div>
+                    </div>
+                    <div class="form-actions">
+                        <button type="submit" class="btn-primary">Save Transaction</button>
+                        <button type="button" class="btn-secondary" onclick="resetInternalTxForm()">Clear</button>
+                    </div>
+                </form>
+            </div>
+            <div id="internal-tx-message" class="message hidden"></div>
+
+            <div class="table-card" style="margin-top: 24px;">
+                <h3>Internal Transactions</h3>
+                <div class="table-wrapper">
+                    <table id="internalTxTable">
+                        <thead>
+                            <tr>
+                                <th>Date</th>
+                                <th>Amount</th>
+                                <th>Direction</th>
+                                <th>Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody></tbody>
+                    </table>
+                </div>
+            </div>
         </section>
 
         <!-- Sales Analysis Page -->
@@ -286,6 +337,7 @@
                                 <th>Electricity</th>
                                 <th>Admin Exp.</th>
                                 <th>Total Exp.</th>
+                                <th>UTSPL</th>
                                 <th>Actions</th>
                             </tr>
                         </thead>

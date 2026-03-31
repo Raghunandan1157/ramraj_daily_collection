@@ -335,6 +335,43 @@ body {
     cursor: not-allowed;
 }
 
+.form-group select {
+    width: 100%;
+    padding: 10px 12px;
+    border: 1px solid var(--border);
+    border-radius: 6px;
+    font-size: 14px;
+    transition: border-color 0.2s;
+    background: #fafafa;
+    cursor: pointer;
+}
+
+.form-group select:focus {
+    outline: none;
+    border-color: var(--accent);
+    background: #fff;
+}
+
+.badge-in {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #d4edda;
+    color: #155724;
+}
+
+.badge-out {
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 600;
+    background: #f8d7da;
+    color: #721c24;
+}
+
 .form-actions {
     display: flex;
     gap: 12px;

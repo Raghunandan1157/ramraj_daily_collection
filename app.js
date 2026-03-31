@@ -6,11 +6,13 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ==================== DATA STORE ====================
 let appData = [];
 let consolidatedData = [];
+let internalTransactions = [];
 
 async function fetchData() {
-    const [dailyRes, consolidatedRes] = await Promise.all([
+    const [dailyRes, consolidatedRes, internalTxRes] = await Promise.all([
         db.from('daily_sales').select('*').order('date', { ascending: true }),
-        db.from('monthly_consolidated').select('*').order('month', { ascending: true })
+        db.from('monthly_consolidated').select('*').order('month', { ascending: true }),
+        db.from('internal_transactions').select('*').order('date', { ascending: false })
     ]);
 
     if (dailyRes.error) {
@@ -32,7 +34,8 @@ async function fetchData() {
                 salaryPaid: Number(row.salary_paid) || 0,
                 electricityPaid: Number(row.electricity_paid) || 0,
                 adminExpenses: Number(row.admin_expenses) || 0,
-                totalExpenses: Number(row.total_expenses) || 0
+                totalExpenses: Number(row.total_expenses) || 0,
+                utspl: Number(row.utspl) || 0
             };
         });
     }
@@ -47,6 +50,17 @@ async function fetchData() {
             salesReturn: Number(row.sales_return) || 0,
             netSales: Number(row.net_sales) || 0,
             avgSales: Number(row.avg_sales_monthly) || 0
+        }));
+    }
+
+    if (internalTxRes.error) {
+        console.error('Error fetching internal transactions:', internalTxRes.error);
+    } else {
+        internalTransactions = internalTxRes.data.map(row => ({
+            id: row.id,
+            date: row.date,
+            amount: Number(row.amount) || 0,
+            direction: row.direction
         }));
     }
 
@@ -70,7 +84,8 @@ async function saveToSupabase(entry) {
         salary_paid: entry.salaryPaid,
         electricity_paid: entry.electricityPaid,
         admin_expenses: entry.adminExpenses,
-        total_expenses: entry.totalExpenses
+        total_expenses: entry.totalExpenses,
+        utspl: entry.utspl
     };
 
     const { error } = await db
@@ -141,6 +156,7 @@ navLinks.forEach(link => {
         }
 
         if (page === 'dashboard') renderDashboard();
+        if (page === 'entry') renderInternalTxTable();
         if (page === 'sales') renderSalesCharts();
         if (page === 'consolidated') renderConsolidatedPage();
         if (page === 'records') renderRecordsTable();
@@ -209,7 +225,8 @@ async function saveEntry(e) {
         salaryPaid: salary,
         electricityPaid: electricity,
         adminExpenses: admin,
-        totalExpenses: salary + electricity + admin
+        totalExpenses: salary + electricity + admin,
+        utspl: parseFloat(document.getElementById('f-utspl').value) || 0
     };
 
     if (!editingDate) {
@@ -243,6 +260,7 @@ function resetForm() {
     document.getElementById('f-salary').value = '0';
     document.getElementById('f-electricity').value = '0';
     document.getElementById('f-admin').value = '0';
+    document.getElementById('f-utspl').value = '0';
     editingDate = null;
     document.getElementById('submitBtn').textContent = 'Save Entry';
 }
@@ -271,6 +289,7 @@ function editEntry(date) {
     fElectricity.value = entry.electricityPaid;
     fAdmin.value = entry.adminExpenses;
     fTotalExp.value = entry.totalExpenses;
+    document.getElementById('f-utspl').value = entry.utspl;
     document.getElementById('submitBtn').textContent = 'Update Entry';
 
     navLinks.forEach(l => l.classList.remove('active'));
@@ -289,6 +308,79 @@ async function deleteEntry(date) {
         renderRecordsTable();
     }
     hideLoading();
+}
+
+// ==================== INTERNAL TRANSACTIONS ====================
+document.getElementById('it-date').valueAsDate = new Date();
+
+async function saveInternalTx(e) {
+    e.preventDefault();
+    const date = document.getElementById('it-date').value;
+    const amount = parseFloat(document.getElementById('it-amount').value) || 0;
+    const direction = document.getElementById('it-direction').value;
+
+    if (!date || !amount || !direction) {
+        showInternalTxMessage('Please fill all fields.', 'error');
+        return false;
+    }
+
+    showLoading();
+    const { error } = await db.from('internal_transactions').insert({ date, amount, direction });
+    if (error) {
+        console.error('Error saving internal transaction:', error);
+        showInternalTxMessage('Error saving. Check console.', 'error');
+    } else {
+        showInternalTxMessage('Transaction saved!', 'success');
+        resetInternalTxForm();
+        await fetchData();
+        renderInternalTxTable();
+    }
+    hideLoading();
+    return false;
+}
+
+function resetInternalTxForm() {
+    document.getElementById('internalTxForm').reset();
+    document.getElementById('it-date').valueAsDate = new Date();
+}
+
+async function deleteInternalTx(id) {
+    if (!confirm('Delete this transaction?')) return;
+    showLoading();
+    const { error } = await db.from('internal_transactions').delete().eq('id', id);
+    if (!error) {
+        await fetchData();
+        renderInternalTxTable();
+    }
+    hideLoading();
+}
+
+function renderInternalTxTable() {
+    const tbody = document.querySelector('#internalTxTable tbody');
+    tbody.innerHTML = '';
+    if (internalTransactions.length === 0) {
+        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-light)">No transactions yet</td></tr>';
+        return;
+    }
+    internalTransactions.forEach(tx => {
+        const tr = document.createElement('tr');
+        const badgeClass = tx.direction === 'IN' ? 'badge-in' : 'badge-out';
+        const label = tx.direction === 'IN' ? 'Money IN' : 'Money OUT';
+        tr.innerHTML = `
+            <td>${tx.date}</td>
+            <td>${fmtCurrency(tx.amount)}</td>
+            <td><span class="${badgeClass}">${label}</span></td>
+            <td><button class="btn-delete" onclick="deleteInternalTx(${tx.id})">Del</button></td>
+        `;
+        tbody.appendChild(tr);
+    });
+}
+
+function showInternalTxMessage(text, type) {
+    const msg = document.getElementById('internal-tx-message');
+    msg.textContent = text;
+    msg.className = 'message ' + type;
+    setTimeout(() => msg.className = 'message hidden', 3000);
 }
 
 // ==================== FORMATTING ====================
@@ -750,6 +842,7 @@ function renderRecordsTable() {
             <td>${fmtCurrency(d.electricityPaid)}</td>
             <td>${fmtCurrency(d.adminExpenses)}</td>
             <td class="${d.totalExpenses > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.totalExpenses)}</td>
+            <td>${d.utspl ? fmtCurrency(d.utspl) : '--'}</td>
             <td>
                 <button class="btn-edit" onclick="editEntry('${d.date}')">Edit</button>
                 <button class="btn-delete" onclick="deleteEntry('${d.date}')">Del</button>
@@ -771,11 +864,11 @@ function exportData() {
         return;
     }
 
-    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
+    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses', 'UTSPL'];
     const rows = data.map(d => [
         d.date, d.sale, d.bills, d.salesReturns, d.netSales,
         d.closingStock, d.bankBalance, d.ordersPlaced,
-        d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses
+        d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses, d.utspl
     ]);
 
     let csv = headers.join(',') + '\n';
@@ -795,8 +888,9 @@ async function init() {
     showLoading();
     await fetchData();
     renderDashboard();
+    renderInternalTxTable();
     hideLoading();
-    console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly records.');
+    console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly + ' + internalTransactions.length + ' internal transaction records.');
 }
 
 init();

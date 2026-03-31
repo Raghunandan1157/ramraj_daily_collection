@@ -156,7 +156,7 @@ navLinks.forEach(link => {
         }
 
         if (page === 'dashboard') renderDashboard();
-        if (page === 'entry') renderInternalTxTable();
+        if (page === 'entry') { /* no table to render */ }
         if (page === 'sales') renderSalesCharts();
         if (page === 'consolidated') renderConsolidatedPage();
         if (page === 'records') renderRecordsTable();
@@ -312,20 +312,26 @@ async function deleteEntry(date) {
 
 // ==================== INTERNAL TRANSACTIONS ====================
 document.getElementById('it-date').valueAsDate = new Date();
+let selectedDirection = null;
+
+function selectDirection(dir) {
+    selectedDirection = dir;
+    document.getElementById('btn-dir-in').classList.toggle('active', dir === 'IN');
+    document.getElementById('btn-dir-out').classList.toggle('active', dir === 'OUT');
+}
 
 async function saveInternalTx(e) {
     e.preventDefault();
     const date = document.getElementById('it-date').value;
     const amount = parseFloat(document.getElementById('it-amount').value) || 0;
-    const direction = document.getElementById('it-direction').value;
 
-    if (!date || !amount || !direction) {
-        showInternalTxMessage('Please fill all fields.', 'error');
+    if (!date || !amount || !selectedDirection) {
+        showInternalTxMessage('Please fill all fields and select IN or OUT.', 'error');
         return false;
     }
 
     showLoading();
-    const { error } = await db.from('internal_transactions').insert({ date, amount, direction });
+    const { error } = await db.from('internal_transactions').insert({ date, amount, direction: selectedDirection });
     if (error) {
         console.error('Error saving internal transaction:', error);
         showInternalTxMessage('Error saving. Check console.', 'error');
@@ -333,7 +339,7 @@ async function saveInternalTx(e) {
         showInternalTxMessage('Transaction saved!', 'success');
         resetInternalTxForm();
         await fetchData();
-        renderInternalTxTable();
+        renderRecordsTable();
     }
     hideLoading();
     return false;
@@ -342,6 +348,9 @@ async function saveInternalTx(e) {
 function resetInternalTxForm() {
     document.getElementById('internalTxForm').reset();
     document.getElementById('it-date').valueAsDate = new Date();
+    selectedDirection = null;
+    document.getElementById('btn-dir-in').classList.remove('active');
+    document.getElementById('btn-dir-out').classList.remove('active');
 }
 
 async function deleteInternalTx(id) {
@@ -350,30 +359,9 @@ async function deleteInternalTx(id) {
     const { error } = await db.from('internal_transactions').delete().eq('id', id);
     if (!error) {
         await fetchData();
-        renderInternalTxTable();
+        renderRecordsTable();
     }
     hideLoading();
-}
-
-function renderInternalTxTable() {
-    const tbody = document.querySelector('#internalTxTable tbody');
-    tbody.innerHTML = '';
-    if (internalTransactions.length === 0) {
-        tbody.innerHTML = '<tr><td colspan="4" style="text-align:center;color:var(--text-light)">No transactions yet</td></tr>';
-        return;
-    }
-    internalTransactions.forEach(tx => {
-        const tr = document.createElement('tr');
-        const badgeClass = tx.direction === 'IN' ? 'badge-in' : 'badge-out';
-        const label = tx.direction === 'IN' ? 'Money IN' : 'Money OUT';
-        tr.innerHTML = `
-            <td>${tx.date}</td>
-            <td>${fmtCurrency(tx.amount)}</td>
-            <td><span class="${badgeClass}">${label}</span></td>
-            <td><button class="btn-delete" onclick="deleteInternalTx(${tx.id})">Del</button></td>
-        `;
-        tbody.appendChild(tr);
-    });
 }
 
 function showInternalTxMessage(text, type) {
@@ -828,6 +816,15 @@ function renderRecordsTable() {
     if (monthVal) filtered = filtered.filter(d => d.date.startsWith(monthVal));
 
     filtered.forEach(d => {
+        const txForDate = internalTransactions.filter(tx => tx.date === d.date);
+        const txHtml = txForDate.length > 0
+            ? txForDate.map(tx => {
+                const cls = tx.direction === 'IN' ? 'tx-in' : 'tx-out';
+                const sign = tx.direction === 'IN' ? '+' : '-';
+                return `<div class="${cls}">${sign}${fmtCurrency(tx.amount)} <button class="btn-tx-del" onclick="deleteInternalTx(${tx.id})" title="Delete">&#10005;</button></div>`;
+            }).join('')
+            : '--';
+
         const tr = document.createElement('tr');
         tr.innerHTML = `
             <td>${d.date}</td>
@@ -837,6 +834,7 @@ function renderRecordsTable() {
             <td>${fmtCurrency(d.netSales)}</td>
             <td>${fmtLakhs(d.closingStock)}</td>
             <td>${fmtCurrency(d.bankBalance)}</td>
+            <td>${txHtml}</td>
             <td>${fmtCurrency(d.ordersPlaced)}</td>
             <td>${fmtCurrency(d.salaryPaid)}</td>
             <td>${fmtCurrency(d.electricityPaid)}</td>
@@ -888,7 +886,6 @@ async function init() {
     showLoading();
     await fetchData();
     renderDashboard();
-    renderInternalTxTable();
     hideLoading();
     console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly + ' + internalTransactions.length + ' internal transaction records.');
 }

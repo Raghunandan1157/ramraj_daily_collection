@@ -17,6 +17,7 @@ CREATE TABLE IF NOT EXISTS daily_sales (
     electricity_paid NUMERIC(12,2) DEFAULT 0,
     admin_expenses NUMERIC(12,2) DEFAULT 0,
     total_expenses NUMERIC(12,2) DEFAULT 0,
+    internal_txn NUMERIC(14,2) DEFAULT 0,  -- positive = money IN, negative = money OUT
     -- Website-specific fields
     open_time TIME DEFAULT '09:30',
     close_time TIME DEFAULT '21:30',

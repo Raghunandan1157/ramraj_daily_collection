@@ -6,13 +6,11 @@ const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_KEY);
 // ==================== DATA STORE ====================
 let appData = [];
 let consolidatedData = [];
-let internalTransactions = [];
 
 async function fetchData() {
-    const [dailyRes, consolidatedRes, internalTxRes] = await Promise.all([
+    const [dailyRes, consolidatedRes] = await Promise.all([
         db.from('daily_sales').select('*').order('date', { ascending: true }),
-        db.from('monthly_consolidated').select('*').order('month', { ascending: true }),
-        db.from('internal_transactions').select('*').order('date', { ascending: false })
+        db.from('monthly_consolidated').select('*').order('month', { ascending: true })
     ]);
 
     if (dailyRes.error) {
@@ -34,7 +32,8 @@ async function fetchData() {
                 salaryPaid: Number(row.salary_paid) || 0,
                 electricityPaid: Number(row.electricity_paid) || 0,
                 adminExpenses: Number(row.admin_expenses) || 0,
-                totalExpenses: Number(row.total_expenses) || 0
+                totalExpenses: Number(row.total_expenses) || 0,
+                internalTxn: Number(row.internal_txn) || 0
             };
         });
     }
@@ -49,17 +48,6 @@ async function fetchData() {
             salesReturn: Number(row.sales_return) || 0,
             netSales: Number(row.net_sales) || 0,
             avgSales: Number(row.avg_sales_monthly) || 0
-        }));
-    }
-
-    if (internalTxRes.error) {
-        console.error('Error fetching internal transactions:', internalTxRes.error);
-    } else {
-        internalTransactions = internalTxRes.data.map(row => ({
-            id: row.id,
-            date: row.date,
-            amount: Number(row.amount) || 0,
-            direction: row.direction
         }));
     }
 
@@ -83,7 +71,8 @@ async function saveToSupabase(entry) {
         salary_paid: entry.salaryPaid,
         electricity_paid: entry.electricityPaid,
         admin_expenses: entry.adminExpenses,
-        total_expenses: entry.totalExpenses
+        total_expenses: entry.totalExpenses,
+        internal_txn: entry.internalTxn
     };
 
     const { error } = await db
@@ -211,6 +200,9 @@ async function saveEntry(e) {
     const electricity = parseFloat(fElectricity.value) || 0;
     const admin = parseFloat(fAdmin.value) || 0;
 
+    const intxnAmt = parseFloat(document.getElementById('f-intxn').value) || 0;
+    const intxnSigned = intxnAmt === 0 ? 0 : (selectedDirection === 'OUT' ? -Math.abs(intxnAmt) : Math.abs(intxnAmt));
+
     const entry = {
         date: document.getElementById('f-date').value,
         sale: sales,
@@ -223,7 +215,8 @@ async function saveEntry(e) {
         salaryPaid: salary,
         electricityPaid: electricity,
         adminExpenses: admin,
-        totalExpenses: salary + electricity + admin
+        totalExpenses: salary + electricity + admin,
+        internalTxn: intxnSigned
     };
 
     if (!editingDate) {
@@ -257,6 +250,10 @@ function resetForm() {
     document.getElementById('f-salary').value = '0';
     document.getElementById('f-electricity').value = '0';
     document.getElementById('f-admin').value = '0';
+    document.getElementById('f-intxn').value = '0';
+    selectedDirection = null;
+    document.getElementById('btn-dir-in').classList.remove('active');
+    document.getElementById('btn-dir-out').classList.remove('active');
     editingDate = null;
     document.getElementById('submitBtn').textContent = 'Save Entry';
 }
@@ -285,6 +282,10 @@ function editEntry(date) {
     fElectricity.value = entry.electricityPaid;
     fAdmin.value = entry.adminExpenses;
     fTotalExp.value = entry.totalExpenses;
+    document.getElementById('f-intxn').value = Math.abs(entry.internalTxn);
+    if (entry.internalTxn > 0) selectDirection('IN');
+    else if (entry.internalTxn < 0) selectDirection('OUT');
+    else { selectedDirection = null; document.getElementById('btn-dir-in').classList.remove('active'); document.getElementById('btn-dir-out').classList.remove('active'); }
     document.getElementById('submitBtn').textContent = 'Update Entry';
 
     navLinks.forEach(l => l.classList.remove('active'));
@@ -305,65 +306,13 @@ async function deleteEntry(date) {
     hideLoading();
 }
 
-// ==================== INTERNAL TRANSACTIONS ====================
-document.getElementById('it-date').valueAsDate = new Date();
+// ==================== DIRECTION TOGGLE (Int. Transaction in daily form) ====================
 let selectedDirection = null;
 
 function selectDirection(dir) {
     selectedDirection = dir;
     document.getElementById('btn-dir-in').classList.toggle('active', dir === 'IN');
     document.getElementById('btn-dir-out').classList.toggle('active', dir === 'OUT');
-}
-
-async function saveInternalTx(e) {
-    e.preventDefault();
-    const date = document.getElementById('it-date').value;
-    const amount = parseFloat(document.getElementById('it-amount').value) || 0;
-
-    if (!date || !amount || !selectedDirection) {
-        showInternalTxMessage('Please fill all fields and select IN or OUT.', 'error');
-        return false;
-    }
-
-    showLoading();
-    const { error } = await db.from('internal_transactions').insert({ date, amount, direction: selectedDirection });
-    if (error) {
-        console.error('Error saving internal transaction:', error);
-        showInternalTxMessage('Error saving. Check console.', 'error');
-    } else {
-        showInternalTxMessage('Transaction saved!', 'success');
-        resetInternalTxForm();
-        await fetchData();
-        renderRecordsTable();
-    }
-    hideLoading();
-    return false;
-}
-
-function resetInternalTxForm() {
-    document.getElementById('internalTxForm').reset();
-    document.getElementById('it-date').valueAsDate = new Date();
-    selectedDirection = null;
-    document.getElementById('btn-dir-in').classList.remove('active');
-    document.getElementById('btn-dir-out').classList.remove('active');
-}
-
-async function deleteInternalTx(id) {
-    if (!confirm('Delete this transaction?')) return;
-    showLoading();
-    const { error } = await db.from('internal_transactions').delete().eq('id', id);
-    if (!error) {
-        await fetchData();
-        renderRecordsTable();
-    }
-    hideLoading();
-}
-
-function showInternalTxMessage(text, type) {
-    const msg = document.getElementById('internal-tx-message');
-    msg.textContent = text;
-    msg.className = 'message ' + type;
-    setTimeout(() => msg.className = 'message hidden', 3000);
 }
 
 // ==================== FORMATTING ====================
@@ -811,14 +760,9 @@ function renderRecordsTable() {
     if (monthVal) filtered = filtered.filter(d => d.date.startsWith(monthVal));
 
     filtered.forEach(d => {
-        const txForDate = internalTransactions.filter(tx => tx.date === d.date);
-        const txHtml = txForDate.length > 0
-            ? txForDate.map(tx => {
-                const cls = tx.direction === 'IN' ? 'tx-in' : 'tx-out';
-                const sign = tx.direction === 'IN' ? '+' : '-';
-                return `<div class="${cls}">${sign}${fmtCurrency(tx.amount)} <button class="btn-tx-del" onclick="deleteInternalTx(${tx.id})" title="Delete">&#10005;</button></div>`;
-            }).join('')
-            : '--';
+        let txHtml = '--';
+        if (d.internalTxn > 0) txHtml = `<span class="tx-in">+${fmtCurrency(d.internalTxn)}</span>`;
+        else if (d.internalTxn < 0) txHtml = `<span class="tx-out">-${fmtCurrency(Math.abs(d.internalTxn))}</span>`;
 
         const tr = document.createElement('tr');
         tr.innerHTML = `

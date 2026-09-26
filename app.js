@@ -16,32 +16,28 @@ async function fetchData() {
     if (dailyRes.error) {
         console.error('Error fetching daily:', dailyRes.error);
     } else {
-        appData = dailyRes.data.map(row => {
-            const sales = Number(row.sales) || 0;
-            const bills = Number(row.no_of_bills) || 0;
-            return {
-                id: row.id,
-                date: row.date,
-                sale: sales,
-                bills: bills,
-                salesReturns: Number(row.sales_returns) || 0,
-                netSales: Number(row.net_sales) || 0,
-                closingStock: Number(row.closing_stock) || 0,
-                bankBalance: Number(row.bank_balance) || 0,
-                ordersPlaced: Number(row.orders_placed_amount) || 0,
-                salaryPaid: Number(row.salary_paid) || 0,
-                electricityPaid: Number(row.electricity_paid) || 0,
-                adminExpenses: Number(row.admin_expenses) || 0,
-                totalExpenses: Number(row.total_expenses) || 0,
-                internalTxn: Number(row.internal_txn) || 0,
-                qtySold: Number(row.quantity) || 0,
-                margin: Number(row.margin) || 0,
-                cashSales: Number(row.cash_sales) || 0,
-                bankSales: Number(row.bank_sales) || 0,
-                upiSales: Number(row.upi_sales) || 0,
-                loyalty: Number(row.loyalty) || 0
-            };
-        });
+        appData = dailyRes.data.map(row => ({
+            id: row.id,
+            date: row.date,
+            sale: Number(row.sales) || 0,
+            bills: Number(row.no_of_bills) || 0,
+            salesReturns: Number(row.sales_returns) || 0,
+            netSales: Number(row.net_sales) || 0,
+            closingStock: Number(row.closing_stock) || 0,
+            bankBalance: Number(row.bank_balance) || 0,
+            ordersPlaced: Number(row.orders_placed_amount) || 0,
+            salaryPaid: Number(row.salary_paid) || 0,
+            electricityPaid: Number(row.electricity_paid) || 0,
+            adminExpenses: Number(row.admin_expenses) || 0,
+            totalExpenses: Number(row.total_expenses) || 0,
+            internalTxn: Number(row.internal_txn) || 0,
+            qtySold: Number(row.quantity) || 0,
+            margin: Number(row.margin) || 0,
+            cashSales: Number(row.cash_sales) || 0,
+            bankSales: Number(row.bank_sales) || 0,
+            upiSales: Number(row.upi_sales) || 0,
+            loyalty: Number(row.loyalty) || 0
+        }));
     }
 
     if (consolidatedRes.error) {
@@ -56,6 +52,12 @@ async function fetchData() {
             avgSales: Number(row.avg_sales_monthly) || 0
         }));
     }
+
+    const ok = !dailyRes.error;
+    const syncEl = document.getElementById('syncStatus');
+    syncEl.textContent = ok
+        ? 'Synced with Supabase · ' + new Date().toLocaleTimeString('en-IN', { hour: 'numeric', minute: '2-digit' })
+        : 'Could not reach Supabase';
 
     return appData;
 }
@@ -112,240 +114,46 @@ async function deleteFromSupabase(date) {
     return true;
 }
 
-// ==================== LOADING ====================
-function showLoading() {
-    document.getElementById('loadingOverlay').classList.add('visible');
+// ==================== HELPERS ====================
+const $ = id => document.getElementById(id);
+const val = id => parseFloat($(id).value) || 0;
+const sum = (rows, key) => rows.reduce((s, d) => s + (d[key] || 0), 0);
+const pct = x => (x * 100).toFixed(1) + '%';
+const clampPct = x => Math.max(0, Math.min(100, x * 100));
+
+const ICON_CHECK = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="m5 12 5 5 9-10"/></svg>';
+const ICON_ALERT = '<svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>';
+const ICON_EDIT = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>';
+const ICON_TRASH = '<svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
+
+// ==================== DATES ====================
+// Dates from Supabase are 'YYYY-MM-DD'; parse them as local dates, not UTC.
+function parseISODate(s) {
+    const [y, m, d] = s.split('-').map(Number);
+    return new Date(y, m - 1, d);
 }
 
-function hideLoading() {
-    document.getElementById('loadingOverlay').classList.remove('visible');
+function toISODate(dt) {
+    return dt.getFullYear() + '-' + String(dt.getMonth() + 1).padStart(2, '0') + '-' + String(dt.getDate()).padStart(2, '0');
 }
 
-async function refreshData() {
-    showLoading();
-    await fetchData();
-    renderDashboard();
-    hideLoading();
+function todayISO() {
+    return toISODate(new Date());
 }
 
-// ==================== NAVIGATION ====================
-const navLinks = document.querySelectorAll('.nav-links li');
-const pages = document.querySelectorAll('.page');
-const pageTitle = document.getElementById('page-title');
-
-const pageTitles = {
-    dashboard: 'Dashboard',
-    entry: 'Data Entry',
-    sales: 'Sales Analysis',
-    consolidated: 'Monthly Overview',
-    records: 'All Records'
-};
-
-navLinks.forEach(link => {
-    link.addEventListener('click', () => {
-        const page = link.dataset.page;
-        navLinks.forEach(l => l.classList.remove('active'));
-        link.classList.add('active');
-        pages.forEach(p => p.classList.remove('active'));
-        document.getElementById('page-' + page).classList.add('active');
-        pageTitle.textContent = pageTitles[page];
-
-        if (window.innerWidth <= 768) {
-            document.getElementById('sidebar').classList.remove('open');
-        }
-
-        if (page === 'dashboard') renderDashboard();
-        if (page === 'entry') { /* no table to render */ }
-        if (page === 'sales') renderSalesCharts();
-        if (page === 'consolidated') renderConsolidatedPage();
-        if (page === 'records') renderRecordsTable();
-    });
-});
-
-function toggleSidebar() {
-    const sidebar = document.getElementById('sidebar');
-    sidebar.classList.toggle('open');
-    sidebar.classList.toggle('collapsed');
-    document.querySelector('.main-content').classList.toggle('expanded');
+function fmtDate(s, opts) {
+    return parseISODate(s).toLocaleDateString('en-IN', opts);
 }
 
-// ==================== DATE SETUP ====================
-document.getElementById('current-date').textContent = new Date().toLocaleDateString('en-IN', {
-    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
-});
-document.getElementById('f-date').valueAsDate = new Date();
-
-// ==================== FORM AUTO-CALC ====================
-const fSales = document.getElementById('f-sales');
-const fBills = document.getElementById('f-bills');
-const fReturns = document.getElementById('f-returns');
-const fNetSales = document.getElementById('f-netsales');
-const fSalary = document.getElementById('f-salary');
-const fElectricity = document.getElementById('f-electricity');
-const fAdmin = document.getElementById('f-admin');
-const fTotalExp = document.getElementById('f-totalexp');
-
-function autoCalc() {
-    const sales = parseFloat(fSales.value) || 0;
-    const returns = parseFloat(fReturns.value) || 0;
-    const salary = parseFloat(fSalary.value) || 0;
-    const electricity = parseFloat(fElectricity.value) || 0;
-    const admin = parseFloat(fAdmin.value) || 0;
-
-    fNetSales.value = (sales - returns).toFixed(2);
-    fTotalExp.value = (salary + electricity + admin).toFixed(2);
+function shortLabel(s) {
+    const dt = parseISODate(s);
+    return dt.getDate() + '/' + (dt.getMonth() + 1);
 }
 
-[fSales, fReturns, fSalary, fElectricity, fAdmin].forEach(el => {
-    el.addEventListener('input', autoCalc);
-});
-
-// ==================== SAVE / EDIT ENTRY ====================
-let editingDate = null;
-
-async function saveEntry(e) {
-    e.preventDefault();
-
-    const sales = parseFloat(fSales.value) || 0;
-    const returns = parseFloat(fReturns.value) || 0;
-    const salary = parseFloat(fSalary.value) || 0;
-    const electricity = parseFloat(fElectricity.value) || 0;
-    const admin = parseFloat(fAdmin.value) || 0;
-
-    const intxnAmt = parseFloat(document.getElementById('f-intxn').value) || 0;
-    const intxnSigned = intxnAmt === 0 ? 0 : (selectedDirection === 'OUT' ? -Math.abs(intxnAmt) : Math.abs(intxnAmt));
-
-    const entry = {
-        date: document.getElementById('f-date').value,
-        sale: sales,
-        bills: parseInt(fBills.value) || 0,
-        salesReturns: returns,
-        netSales: sales - returns,
-        closingStock: parseFloat(document.getElementById('f-stock').value) || 0,
-        bankBalance: parseFloat(document.getElementById('f-bank').value) || 0,
-        ordersPlaced: parseFloat(document.getElementById('f-orders').value) || 0,
-        salaryPaid: salary,
-        electricityPaid: electricity,
-        adminExpenses: admin,
-        totalExpenses: salary + electricity + admin,
-        internalTxn: intxnSigned,
-        qtySold: parseInt(document.getElementById('f-qty').value) || 0,
-        margin: parseFloat(document.getElementById('f-margin').value) || 0,
-        cashSales: parseFloat(document.getElementById('f-cash').value) || 0,
-        bankSales: parseFloat(document.getElementById('f-banksales').value) || 0,
-        upiSales: parseFloat(document.getElementById('f-upi').value) || 0,
-        loyalty: parseFloat(document.getElementById('f-loyalty').value) || 0
-    };
-
-    const paymentTotal = entry.cashSales + entry.bankSales + entry.upiSales;
-    if (paymentTotal > 0 && Math.abs(paymentTotal - entry.sale) > 1) {
-        showMessage('Cash + Bank + UPI (' + fmtCurrency(paymentTotal) + ') must equal Sales (' + fmtCurrency(entry.sale) + ').', 'error');
-        return false;
-    }
-
-    if (!editingDate) {
-        if (appData.some(d => d.date === entry.date)) {
-            showMessage('Entry for this date already exists. Use edit from Records page.', 'error');
-            return false;
-        }
-    }
-
-    showLoading();
-    const success = await saveToSupabase(entry);
-    if (success) {
-        showMessage('Entry saved to Supabase!', 'success');
-        editingDate = null;
-        document.getElementById('submitBtn').textContent = 'Save Entry';
-        resetForm();
-        await fetchData();
-    } else {
-        showMessage('Error saving entry. Check console.', 'error');
-    }
-    hideLoading();
-
-    return false;
-}
-
-function resetForm() {
-    document.getElementById('entryForm').reset();
-    document.getElementById('f-date').valueAsDate = new Date();
-    document.getElementById('f-returns').value = '0';
-    document.getElementById('f-orders').value = '0';
-    document.getElementById('f-salary').value = '0';
-    document.getElementById('f-electricity').value = '0';
-    document.getElementById('f-admin').value = '0';
-    document.getElementById('f-intxn').value = '0';
-    ['f-qty', 'f-margin', 'f-cash', 'f-banksales', 'f-upi', 'f-loyalty'].forEach(id => {
-        document.getElementById(id).value = '0';
-    });
-    selectedDirection = null;
-    document.getElementById('btn-dir-in').classList.remove('active');
-    document.getElementById('btn-dir-out').classList.remove('active');
-    editingDate = null;
-    document.getElementById('submitBtn').textContent = 'Save Entry';
-}
-
-function showMessage(text, type) {
-    const msg = document.getElementById('entry-message');
-    msg.textContent = text;
-    msg.className = 'message ' + type;
-    setTimeout(() => msg.className = 'message hidden', 3000);
-}
-
-function editEntry(date) {
-    const entry = appData.find(d => d.date === date);
-    if (!entry) return;
-
-    editingDate = date;
-    document.getElementById('f-date').value = entry.date;
-    fSales.value = entry.sale;
-    fBills.value = entry.bills;
-    fReturns.value = entry.salesReturns;
-    fNetSales.value = entry.netSales;
-    document.getElementById('f-stock').value = entry.closingStock;
-    document.getElementById('f-bank').value = entry.bankBalance;
-    document.getElementById('f-orders').value = entry.ordersPlaced;
-    fSalary.value = entry.salaryPaid;
-    fElectricity.value = entry.electricityPaid;
-    fAdmin.value = entry.adminExpenses;
-    fTotalExp.value = entry.totalExpenses;
-    document.getElementById('f-intxn').value = Math.abs(entry.internalTxn);
-    document.getElementById('f-qty').value = entry.qtySold;
-    document.getElementById('f-margin').value = entry.margin;
-    document.getElementById('f-cash').value = entry.cashSales;
-    document.getElementById('f-banksales').value = entry.bankSales;
-    document.getElementById('f-upi').value = entry.upiSales;
-    document.getElementById('f-loyalty').value = entry.loyalty;
-    if (entry.internalTxn > 0) selectDirection('IN');
-    else if (entry.internalTxn < 0) selectDirection('OUT');
-    else { selectedDirection = null; document.getElementById('btn-dir-in').classList.remove('active'); document.getElementById('btn-dir-out').classList.remove('active'); }
-    document.getElementById('submitBtn').textContent = 'Update Entry';
-
-    navLinks.forEach(l => l.classList.remove('active'));
-    document.querySelector('[data-page="entry"]').classList.add('active');
-    pages.forEach(p => p.classList.remove('active'));
-    document.getElementById('page-entry').classList.add('active');
-    pageTitle.textContent = 'Data Entry';
-}
-
-async function deleteEntry(date) {
-    if (!confirm('Delete entry for ' + date + '?')) return;
-    showLoading();
-    const success = await deleteFromSupabase(date);
-    if (success) {
-        await fetchData();
-        renderRecordsTable();
-    }
-    hideLoading();
-}
-
-// ==================== DIRECTION TOGGLE (Int. Transaction in daily form) ====================
-let selectedDirection = null;
-
-function selectDirection(dir) {
-    selectedDirection = dir;
-    document.getElementById('btn-dir-in').classList.toggle('active', dir === 'IN');
-    document.getElementById('btn-dir-out').classList.toggle('active', dir === 'OUT');
+function isDayBefore(a, b) {
+    const next = parseISODate(a);
+    next.setDate(next.getDate() + 1);
+    return toISODate(next) === b;
 }
 
 // ==================== FORMATTING ====================
@@ -356,388 +164,733 @@ function fmt(n) {
 
 function fmtCurrency(n) {
     if (n === undefined || n === null || isNaN(n)) return '--';
-    return '\u20B9' + new Intl.NumberFormat('en-IN').format(Math.round(n));
+    return (n < 0 ? '−' : '') + '₹' + new Intl.NumberFormat('en-IN').format(Math.round(Math.abs(n)));
 }
 
 function fmtLakhs(n) {
     if (n === undefined || n === null || isNaN(n)) return '--';
-    return '\u20B9' + (n / 100000).toFixed(2) + 'L';
+    return '₹' + (n / 100000).toFixed(2) + ' L';
 }
 
 function formatMonth(dateStr) {
-    const dt = new Date(dateStr);
-    return dt.toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+    return fmtDate(dateStr, { month: 'short', year: 'numeric' });
+}
+
+function axisMoney(v) {
+    const a = Math.abs(v), sign = v < 0 ? '−' : '';
+    if (a >= 100000) return sign + '₹' + +(a / 100000).toFixed(1) + 'L';
+    if (a >= 1000) return sign + '₹' + +(a / 1000).toFixed(1) + 'K';
+    return sign + '₹' + a;
+}
+
+// ==================== CHART DEFAULTS ====================
+const C = {
+    green: '#1E4D2B',
+    greenMid: '#7FA67A',
+    greenBar: '#B7CEB3',
+    greenFill: 'rgba(30,77,43,0.08)',
+    yellow: '#F2C94C',
+    gold: '#B08A12',
+    red: '#B42318',
+    redLight: '#E8A29A',
+    ink: '#16241A',
+    inkFill: 'rgba(22,36,26,0.06)',
+    muted: '#5B6B5F',
+    grid: '#EFECE1'
+};
+
+Chart.defaults.font.family = "'IBM Plex Sans', system-ui, sans-serif";
+Chart.defaults.font.size = 12;
+Chart.defaults.color = C.muted;
+Chart.defaults.borderColor = C.grid;
+Chart.defaults.maintainAspectRatio = false;
+Chart.defaults.plugins.legend.labels.boxWidth = 10;
+Chart.defaults.plugins.legend.labels.boxHeight = 10;
+Chart.defaults.plugins.tooltip.backgroundColor = C.ink;
+Chart.defaults.plugins.tooltip.padding = 10;
+Chart.defaults.plugins.tooltip.cornerRadius = 8;
+
+const moneyTooltip = { callbacks: { label: c => c.dataset.label + ': ' + fmtCurrency(c.parsed.y) } };
+const moneyScale = { ticks: { callback: axisMoney, maxTicksLimit: 6 } };
+const noGridX = { grid: { display: false } };
+
+// ==================== LOADING ====================
+function showLoading() {
+    $('loadingOverlay').classList.add('visible');
+}
+
+function hideLoading() {
+    $('loadingOverlay').classList.remove('visible');
+}
+
+async function refreshData() {
+    showLoading();
+    await fetchData();
+    selectedIndex = -1;
+    renderCurrentPage();
+    hideLoading();
+}
+
+// ==================== NAVIGATION ====================
+const navButtons = document.querySelectorAll('.nav-link[data-page]');
+const pages = document.querySelectorAll('.page');
+const pageTitle = $('page-title');
+let currentPage = 'dashboard';
+
+const pageTitles = {
+    dashboard: 'Dashboard',
+    entry: 'Daily entry',
+    sales: 'Sales analysis',
+    consolidated: 'Monthly overview',
+    records: 'All records'
+};
+
+navButtons.forEach(btn => btn.addEventListener('click', () => showPage(btn.dataset.page)));
+
+function showPage(page) {
+    currentPage = page;
+    navButtons.forEach(b => {
+        const on = b.dataset.page === page;
+        b.classList.toggle('active', on);
+        if (on) b.setAttribute('aria-current', 'page');
+        else b.removeAttribute('aria-current');
+    });
+    pages.forEach(p => p.classList.toggle('active', p.id === 'page-' + page));
+    pageTitle.textContent = pageTitles[page];
+    document.body.dataset.page = page;
+    closeSidebar();
+    window.scrollTo(0, 0);
+    renderCurrentPage();
+}
+
+function renderCurrentPage() {
+    if (currentPage === 'dashboard') renderDashboard();
+    if (currentPage === 'entry') updateEntrySummary();
+    if (currentPage === 'sales') renderSalesCharts();
+    if (currentPage === 'consolidated') renderConsolidatedPage();
+    if (currentPage === 'records') renderRecordsTable();
+}
+
+function toggleSidebar() {
+    const open = !$('sidebar').classList.contains('open');
+    $('sidebar').classList.toggle('open', open);
+    $('sidebarBackdrop').classList.toggle('visible', open);
+    $('menuToggle').setAttribute('aria-expanded', String(open));
+}
+
+function closeSidebar() {
+    $('sidebar').classList.remove('open');
+    $('sidebarBackdrop').classList.remove('visible');
+    $('menuToggle').setAttribute('aria-expanded', 'false');
+}
+
+// ==================== DATE SETUP ====================
+$('current-date').textContent = new Date().toLocaleDateString('en-IN', {
+    weekday: 'long', year: 'numeric', month: 'long', day: 'numeric'
+});
+$('f-date').value = todayISO();
+
+// ==================== DATA ENTRY ====================
+let editingDate = null;
+let selectedDirection = null;
+let messageTimer = null;
+
+// Form field id -> entry property, used to fill the form when editing
+const FIELD_MAP = {
+    'f-sales': 'sale',
+    'f-bills': 'bills',
+    'f-returns': 'salesReturns',
+    'f-qty': 'qtySold',
+    'f-margin': 'margin',
+    'f-cash': 'cashSales',
+    'f-banksales': 'bankSales',
+    'f-upi': 'upiSales',
+    'f-loyalty': 'loyalty',
+    'f-stock': 'closingStock',
+    'f-bank': 'bankBalance',
+    'f-orders': 'ordersPlaced',
+    'f-salary': 'salaryPaid',
+    'f-electricity': 'electricityPaid',
+    'f-admin': 'adminExpenses'
+};
+
+$('entryForm').addEventListener('input', updateEntrySummary);
+
+// Select the whole value on focus so a default "0" is replaced by typing
+document.querySelectorAll('#entryForm input[type="number"]').forEach(el => {
+    el.addEventListener('focus', () => el.select());
+});
+
+function paymentMismatch(sales, pay) {
+    const diff = pay - sales;
+    if (!pay || Math.abs(diff) <= 1) return '';
+    return diff < 0 ? 'short by ' + fmtCurrency(-diff) : 'over by ' + fmtCurrency(diff);
+}
+
+function updateEntrySummary() {
+    const sales = val('f-sales');
+    const returns = val('f-returns');
+    const net = sales - returns;
+    const bills = val('f-bills');
+    const margin = val('f-margin');
+    const cash = val('f-cash'), bank = val('f-banksales'), upi = val('f-upi');
+    const pay = cash + bank + upi;
+    const expenses = val('f-salary') + val('f-electricity') + val('f-admin');
+    const txn = Math.abs(val('f-intxn'));
+
+    $('f-netsales').value = sales ? net.toFixed(2) : '';
+
+    // Payment reconciliation
+    $('payAccounted').innerHTML = 'Accounted <strong>' + fmtCurrency(pay) + '</strong> of ' + fmtCurrency(sales);
+    const base = Math.max(sales, pay) || 1;
+    $('entryBarCash').style.width = clampPct(cash / base) + '%';
+    $('entryBarBank').style.width = clampPct(bank / base) + '%';
+    $('entryBarUpi').style.width = clampPct(upi / base) + '%';
+
+    const mismatch = paymentMismatch(sales, pay);
+    const status = $('payStatus');
+    if (!sales && !pay) {
+        status.className = 'check none';
+        status.textContent = '';
+    } else if (!pay) {
+        status.className = 'check none';
+        status.textContent = 'Not entered';
+    } else if (!mismatch) {
+        status.className = 'check ok';
+        status.innerHTML = ICON_CHECK + 'Balanced';
+    } else {
+        status.className = 'check bad';
+        status.innerHTML = ICON_ALERT + mismatch.charAt(0).toUpperCase() + mismatch.slice(1);
+    }
+
+    // Summary panel
+    $('sum-net').textContent = sales ? fmtCurrency(net) : '--';
+    $('sum-avgbill').textContent = sales && bills ? fmtCurrency(sales / bills) : '--';
+    $('sum-margin').textContent = margin && net ? fmtCurrency(margin) + ' · ' + pct(margin / net) : '--';
+    $('sum-returns').textContent = returns ? fmtCurrency(returns) + (sales ? ' · ' + pct(returns / sales) : '') : 'None';
+    $('sum-exp').textContent = fmtCurrency(expenses);
+
+    let txnText = 'None';
+    if (txn && selectedDirection === 'IN') txnText = '+' + fmtCurrency(txn) + ' in';
+    else if (txn && selectedDirection === 'OUT') txnText = '−' + fmtCurrency(txn) + ' out';
+    else if (txn) txnText = fmtCurrency(txn) + ' · pick In or Out';
+    $('sum-txn').textContent = txnText;
+
+    const alertEl = $('sumAlert');
+    if (mismatch) {
+        alertEl.textContent = "Payments don't add up to gross sales yet — " + mismatch + '.';
+        alertEl.classList.remove('hidden');
+    } else {
+        alertEl.classList.add('hidden');
+    }
+}
+
+async function saveEntry(e) {
+    e.preventDefault();
+
+    const sales = val('f-sales');
+    const returns = val('f-returns');
+    const salary = val('f-salary');
+    const electricity = val('f-electricity');
+    const admin = val('f-admin');
+
+    const intxnAmt = Math.abs(val('f-intxn'));
+    if (intxnAmt > 0 && !selectedDirection) {
+        showMessage('Choose In or Out for the internal transfer.', 'error');
+        return false;
+    }
+    const intxnSigned = intxnAmt === 0 ? 0 : (selectedDirection === 'OUT' ? -intxnAmt : intxnAmt);
+
+    const entry = {
+        date: $('f-date').value,
+        sale: sales,
+        bills: parseInt($('f-bills').value) || 0,
+        salesReturns: returns,
+        netSales: sales - returns,
+        closingStock: val('f-stock'),
+        bankBalance: val('f-bank'),
+        ordersPlaced: val('f-orders'),
+        salaryPaid: salary,
+        electricityPaid: electricity,
+        adminExpenses: admin,
+        totalExpenses: salary + electricity + admin,
+        internalTxn: intxnSigned,
+        qtySold: parseInt($('f-qty').value) || 0,
+        margin: val('f-margin'),
+        cashSales: val('f-cash'),
+        bankSales: val('f-banksales'),
+        upiSales: val('f-upi'),
+        loyalty: val('f-loyalty')
+    };
+
+    const paymentTotal = entry.cashSales + entry.bankSales + entry.upiSales;
+    const mismatch = paymentMismatch(entry.sale, paymentTotal);
+    if (mismatch) {
+        showMessage('Cash + Card/bank + UPI (' + fmtCurrency(paymentTotal) + ') must equal gross sales (' + fmtCurrency(entry.sale) + ') — ' + mismatch + '.', 'error');
+        return false;
+    }
+
+    const dayLabel = fmtDate(entry.date, { weekday: 'short', day: 'numeric', month: 'short' });
+    if (!editingDate && appData.some(d => d.date === entry.date)) {
+        showMessage('An entry for ' + dayLabel + ' already exists. Edit it from All records.', 'error');
+        return false;
+    }
+
+    const verb = editingDate ? 'Updated' : 'Saved';
+    showLoading();
+    $('submitBtn').disabled = true;
+    const success = await saveToSupabase(entry);
+    if (success) {
+        resetForm();
+        showMessage(verb + ' the entry for ' + dayLabel + '.', 'success');
+        await fetchData();
+        selectedIndex = -1;
+    } else {
+        showMessage('Could not save the entry. Check your connection and try again.', 'error');
+    }
+    $('submitBtn').disabled = false;
+    hideLoading();
+
+    return false;
+}
+
+function resetForm() {
+    $('entryForm').reset();
+    $('f-date').value = todayISO();
+    selectDirection(null);
+    editingDate = null;
+    $('submitBtn').textContent = 'Save entry';
+    $('editBadge').classList.add('hidden');
+    updateEntrySummary();
+}
+
+function showMessage(text, type) {
+    const msg = $('entry-message');
+    msg.textContent = text;
+    msg.className = 'message ' + type;
+    clearTimeout(messageTimer);
+    messageTimer = setTimeout(() => { msg.className = 'message hidden'; }, 5000);
+}
+
+function editEntry(date) {
+    const entry = appData.find(d => d.date === date);
+    if (!entry) return;
+
+    editingDate = date;
+    $('f-date').value = entry.date;
+    Object.keys(FIELD_MAP).forEach(id => { $(id).value = entry[FIELD_MAP[id]]; });
+    $('f-intxn').value = Math.abs(entry.internalTxn);
+    selectDirection(entry.internalTxn > 0 ? 'IN' : entry.internalTxn < 0 ? 'OUT' : null);
+    $('submitBtn').textContent = 'Update entry';
+    $('editBadge').textContent = 'Editing ' + fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    $('editBadge').classList.remove('hidden');
+
+    showPage('entry');
+}
+
+async function deleteEntry(date) {
+    const label = fmtDate(date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+    if (!confirm('Delete the entry for ' + label + '? This cannot be undone.')) return;
+    showLoading();
+    const success = await deleteFromSupabase(date);
+    if (success) {
+        await fetchData();
+        renderCurrentPage();
+    }
+    hideLoading();
+}
+
+// ==================== DIRECTION TOGGLE (internal transfer) ====================
+function selectDirection(dir) {
+    selectedDirection = dir;
+    $('btn-dir-in').classList.toggle('active', dir === 'IN');
+    $('btn-dir-out').classList.toggle('active', dir === 'OUT');
+    $('btn-dir-in').setAttribute('aria-pressed', String(dir === 'IN'));
+    $('btn-dir-out').setAttribute('aria-pressed', String(dir === 'OUT'));
+    updateEntrySummary();
 }
 
 // ==================== DASHBOARD ====================
-let dashSalesChart, dashBankChart;
+let selectedIndex = -1; // -1 = latest entry
+let dashSalesChart;
+
+const DASH_TEXT_IDS = ['kpi-sale', 'kpi-bills', 'kpi-avgbill', 'kpi-qty', 'kpi-mtd', 'kpi-netsales', 'kpi-margin',
+    'kpi-cash', 'kpi-banksales', 'kpi-upi', 'kpi-loyalty', 'kpi-bank', 'kpi-stock', 'kpi-orders', 'kpi-orders-mtd',
+    'kpi-expenses-mtd', 'exp-salary', 'exp-electricity', 'exp-admin'];
+
+function currentIndex() {
+    const n = getData().length;
+    return selectedIndex < 0 || selectedIndex >= n ? n - 1 : selectedIndex;
+}
+
+function shiftDay(step) {
+    const i = currentIndex() + step;
+    if (i < 0 || i >= getData().length) return;
+    selectedIndex = i;
+    renderDashboard();
+}
+
+function setDelta(el, current, previous, label) {
+    if (previous === null || previous === undefined || previous === 0) {
+        el.textContent = '';
+        el.className = 'delta';
+        return;
+    }
+    const diff = current - previous;
+    el.textContent = (diff >= 0 ? '▲ ' : '▼ ') + Math.abs(diff / previous * 100).toFixed(1) + '% ' + label;
+    el.className = 'delta ' + (diff >= 0 ? 'up' : 'down');
+}
+
+function setAmountChange(el, current, previous, label, colored) {
+    if (previous === null || previous === undefined) {
+        el.textContent = '';
+        el.className = 'kpi-sub';
+        return;
+    }
+    const diff = current - previous;
+    if (Math.round(diff) === 0) {
+        el.textContent = 'No change ' + label;
+        el.className = 'kpi-sub';
+        return;
+    }
+    el.textContent = (diff > 0 ? '▲ ' : '▼ ') + fmtCurrency(Math.abs(diff)) + ' ' + label;
+    el.className = 'kpi-sub' + (colored ? (diff > 0 ? ' up' : ' down') : '');
+}
 
 function renderDashboard() {
     const data = getData();
+    const idx = currentIndex();
+    const today = todayISO();
+    const banner = $('todayBanner');
 
-    // Date range bar
-    if (data.length > 0) {
-        const first = new Date(data[0].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short' });
-        const last = new Date(data[data.length - 1].date).toLocaleDateString('en-IN', { day: 'numeric', month: 'short', year: 'numeric' });
-        document.getElementById('dateRangeBar').textContent = 'Showing ' + data.length + ' records: ' + first + ' \u2013 ' + last;
-    } else {
-        document.getElementById('dateRangeBar').textContent = 'No data loaded';
-    }
+    $('dayPrev').disabled = idx <= 0;
+    $('dayNext').disabled = idx < 0 || idx >= data.length - 1;
 
-    const latest = data.length > 0 ? data[data.length - 1] : null;
-
-    if (!latest) {
-        ['kpi-sale','kpi-netsales','kpi-bills','kpi-returns','kpi-stock','kpi-bank','kpi-margin','kpi-cash','kpi-banksales','kpi-upi','kpi-qty','kpi-loyalty','kpi-orders','kpi-expenses'].forEach(id => {
-            document.getElementById(id).textContent = '--';
-        });
+    if (!data.length) {
+        $('dayLabel').textContent = 'No entries';
+        $('todayBannerText').textContent = "No entries yet. Add the first day's report to fill the dashboard.";
+        banner.classList.remove('hidden');
+        DASH_TEXT_IDS.forEach(id => { $(id).textContent = '--'; });
+        if (dashSalesChart) { dashSalesChart.destroy(); dashSalesChart = null; }
         return;
     }
 
-    const prev = data.length > 1 ? data[data.length - 2] : null;
+    const cur = data[idx];
+    const prev = idx > 0 ? data[idx - 1] : null;
+    const curShort = fmtDate(cur.date, { weekday: 'short', day: 'numeric', month: 'short' });
+    const vsLabel = prev
+        ? 'vs ' + (isDayBefore(prev.date, cur.date) ? fmtDate(prev.date, { weekday: 'short' }) : fmtDate(prev.date, { day: 'numeric', month: 'short' }))
+        : '';
 
-    document.getElementById('kpi-sale').textContent = fmtCurrency(latest.sale);
-    document.getElementById('kpi-netsales').textContent = fmtCurrency(latest.netSales);
-    document.getElementById('kpi-bills').textContent = fmt(latest.bills);
-    document.getElementById('kpi-returns').textContent = fmtCurrency(latest.salesReturns);
-    document.getElementById('kpi-stock').textContent = fmtLakhs(latest.closingStock);
-    document.getElementById('kpi-bank').textContent = fmtCurrency(latest.bankBalance);
-    document.getElementById('kpi-margin').textContent = fmtCurrency(latest.margin);
-    document.getElementById('kpi-cash').textContent = fmtCurrency(latest.cashSales);
-    document.getElementById('kpi-banksales').textContent = fmtCurrency(latest.bankSales);
-    document.getElementById('kpi-upi').textContent = fmtCurrency(latest.upiSales);
-    document.getElementById('kpi-qty').textContent = fmt(latest.qtySold);
-    document.getElementById('kpi-loyalty').textContent = fmtCurrency(latest.loyalty);
-    document.getElementById('kpi-orders').textContent = fmtCurrency(latest.ordersPlaced);
-    document.getElementById('kpi-expenses').textContent = fmtCurrency(latest.totalExpenses);
+    $('dayLabel').textContent = fmtDate(cur.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
 
-    if (prev) {
-        setSub('kpi-sale-sub', latest.sale, prev.sale);
-        setSub('kpi-netsales-sub', latest.netSales, prev.netSales);
-        setSub('kpi-bills-sub', latest.bills, prev.bills);
-        setSub('kpi-returns-sub', latest.salesReturns, prev.salesReturns);
-        setSub('kpi-stock-sub', latest.closingStock, prev.closingStock);
-        setSub('kpi-bank-sub', latest.bankBalance, prev.bankBalance);
-        setSub('kpi-margin-sub', latest.margin, prev.margin);
-        setSub('kpi-cash-sub', latest.cashSales, prev.cashSales);
-        setSub('kpi-banksales-sub', latest.bankSales, prev.bankSales);
-        setSub('kpi-upi-sub', latest.upiSales, prev.upiSales);
-        setSub('kpi-qty-sub', latest.qtySold, prev.qtySold);
-        setSub('kpi-loyalty-sub', latest.loyalty, prev.loyalty);
+    // Banner when today's report hasn't been entered yet
+    if (!data.some(d => d.date === today)) {
+        const todayLabel = fmtDate(today, { weekday: 'short', day: 'numeric', month: 'short' });
+        const showingLatest = idx === data.length - 1 && cur.date < today;
+        $('todayBannerText').textContent = 'No entry yet for today (' + todayLabel + ').' +
+            (showingLatest ? ' Showing the last recorded day, ' + curShort + '.' : '');
+        banner.classList.remove('hidden');
+    } else {
+        banner.classList.add('hidden');
     }
 
-    // Margin % of net sales (overrides the day-on-day text for Margin)
-    if (latest.netSales) {
-        const mEl = document.getElementById('kpi-margin-sub');
-        mEl.textContent = ((latest.margin / latest.netSales) * 100).toFixed(1) + '% of net sales';
-        mEl.className = 'kpi-sub';
+    // Sales
+    $('kpi-sale-label').textContent = 'Gross sales · ' + curShort;
+    $('kpi-sale').textContent = fmtCurrency(cur.sale);
+    setDelta($('kpi-sale-sub'), cur.sale, prev && prev.sale, vsLabel);
+    $('kpi-bills').textContent = fmt(cur.bills);
+    $('kpi-avgbill').textContent = cur.bills ? fmtCurrency(cur.sale / cur.bills) : '--';
+    $('kpi-qty').textContent = fmt(cur.qtySold);
+
+    // Month to date (up to and including the selected day)
+    const monthKey = cur.date.substring(0, 7);
+    const mtd = data.filter(d => d.date.startsWith(monthKey) && d.date <= cur.date);
+    const mtdSales = sum(mtd, 'sale');
+    const monthName = fmtDate(cur.date, { month: 'long' });
+    $('kpi-mtd-label').textContent = monthName + ' to date';
+    $('kpi-mtd').textContent = fmtCurrency(mtdSales);
+    $('kpi-mtd-sub').textContent = mtd.length + (mtd.length === 1 ? ' day' : ' days') + ' · ' + fmtCurrency(mtdSales / mtd.length) + ' / day';
+
+    // Net sales & returns
+    $('kpi-netsales').textContent = fmtCurrency(cur.netSales);
+    const returnsEl = $('kpi-returns');
+    if (cur.salesReturns) {
+        returnsEl.textContent = fmtCurrency(cur.salesReturns) + ' returned' + (cur.sale ? ' · ' + pct(cur.salesReturns / cur.sale) + ' of sales' : '');
+        returnsEl.className = 'kpi-sub bad';
+    } else {
+        returnsEl.textContent = 'No returns';
+        returnsEl.className = 'kpi-sub';
     }
 
-    // Orders — show month total
-    const currentMonth = latest.date.substring(0, 7);
-    const monthOrders = data.filter(d => d.date.startsWith(currentMonth)).reduce((s, d) => s + d.ordersPlaced, 0);
-    document.getElementById('kpi-orders-sub').textContent = 'Month total: ' + fmtCurrency(monthOrders);
+    // Margin
+    const marginShare = cur.netSales ? cur.margin / cur.netSales : 0;
+    $('kpi-margin').textContent = fmtCurrency(cur.margin);
+    $('kpi-margin-sub').textContent = !cur.margin ? 'Not recorded' : cur.netSales ? pct(marginShare) + ' of net sales' : '';
+    $('kpi-margin-meter').style.width = clampPct(marginShare) + '%';
 
-    // Expenses — show month total
-    const monthExpenses = data.filter(d => d.date.startsWith(currentMonth)).reduce((s, d) => s + d.totalExpenses, 0);
-    document.getElementById('kpi-expenses-sub').textContent = 'Month total: ' + fmtCurrency(monthExpenses);
-
-    // Sales trend chart
-    const labels = data.map(d => {
-        const dt = new Date(d.date);
-        return dt.getDate() + '/' + (dt.getMonth() + 1);
+    // Payment split
+    const pay = cur.cashSales + cur.bankSales + cur.upiSales;
+    [
+        ['cashSales', 'kpi-cash', 'payBarCash'],
+        ['bankSales', 'kpi-banksales', 'payBarBank'],
+        ['upiSales', 'kpi-upi', 'payBarUpi']
+    ].forEach(([key, id, bar]) => {
+        $(id).textContent = fmtCurrency(cur[key]);
+        $(id + '-sub').textContent = pay ? pct(cur[key] / pay) : '--';
+        $(bar).style.width = (pay ? cur[key] / pay * 100 : 0) + '%';
     });
+    const payCheck = $('payCheck');
+    const mismatch = paymentMismatch(cur.sale, pay);
+    if (!pay) {
+        payCheck.className = 'check none';
+        payCheck.textContent = 'Not recorded';
+    } else if (!mismatch) {
+        payCheck.className = 'check ok';
+        payCheck.innerHTML = ICON_CHECK + 'Matches gross sales';
+    } else {
+        payCheck.className = 'check bad';
+        payCheck.innerHTML = ICON_ALERT + mismatch.charAt(0).toUpperCase() + mismatch.slice(1);
+    }
+    $('kpi-loyalty').textContent = fmtCurrency(cur.loyalty);
 
-    if (dashSalesChart) dashSalesChart.destroy();
-    dashSalesChart = new Chart(document.getElementById('dashSalesChart'), {
-        type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Daily Sale',
-                data: data.map(d => d.sale),
-                backgroundColor: data.map(d => d.sale > 100000 ? 'rgba(46,204,113,0.7)' : 'rgba(233,69,96,0.7)'),
-                borderRadius: 4
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: {
-                    beginAtZero: true,
-                    ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' }
-                }
-            }
-        }
-    });
+    // Closing bank & internal transfer
+    $('kpi-bank').textContent = fmtCurrency(cur.bankBalance);
+    setAmountChange($('kpi-bank-sub'), cur.bankBalance, prev && prev.bankBalance, vsLabel, true);
+    const txnEl = $('kpi-txn');
+    if (cur.internalTxn) {
+        const incoming = cur.internalTxn > 0;
+        txnEl.textContent = (incoming ? 'Transfer in +' : 'Transfer out −') + fmtCurrency(Math.abs(cur.internalTxn));
+        txnEl.className = 'chip-tag ' + (incoming ? 'in' : 'out');
+    } else {
+        txnEl.className = 'chip-tag hidden';
+    }
 
-    // Bank balance trend
-    if (dashBankChart) dashBankChart.destroy();
-    dashBankChart = new Chart(document.getElementById('dashBankChart'), {
-        type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Closing Bank',
-                data: data.map(d => d.bankBalance),
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52,152,219,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 3,
-                pointHoverRadius: 6
-            }]
-        },
-        options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: {
-                y: {
-                    ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' }
-                }
-            }
-        }
+    // Closing stock & orders
+    $('kpi-stock').textContent = fmtLakhs(cur.closingStock);
+    setAmountChange($('kpi-stock-sub'), cur.closingStock, prev && prev.closingStock, vsLabel, false);
+    $('kpi-orders').textContent = fmtCurrency(cur.ordersPlaced);
+    $('kpi-orders-mtd').textContent = fmtCurrency(sum(mtd, 'ordersPlaced'));
+
+    // Expenses month to date
+    const expParts = { salary: sum(mtd, 'salaryPaid'), electricity: sum(mtd, 'electricityPaid'), admin: sum(mtd, 'adminExpenses') };
+    const expTotal = expParts.salary + expParts.electricity + expParts.admin;
+    $('exp-title').textContent = 'Expenses · ' + monthName + ' to date';
+    $('kpi-expenses-mtd').textContent = fmtCurrency(expTotal);
+    Object.keys(expParts).forEach(k => {
+        $('exp-' + k).textContent = fmtCurrency(expParts[k]);
+        $('exp-' + k + '-bar').style.width = (expTotal ? expParts[k] / expTotal * 100 : 0) + '%';
     });
+    $('kpi-expenses-today').textContent = cur.totalExpenses
+        ? 'Paid out on ' + curShort + ': ' + fmtCurrency(cur.totalExpenses)
+        : 'Nothing paid out on ' + curShort;
+
+    renderDashChart(data, idx, monthKey);
 }
 
-function setSub(id, current, previous) {
-    const el = document.getElementById(id);
-    if (!el) return;
-    const diff = current - previous;
-    const pct = previous ? ((diff / previous) * 100).toFixed(1) : 0;
-    const arrow = diff >= 0 ? '\u25B2' : '\u25BC';
-    el.textContent = arrow + ' ' + Math.abs(pct) + '% vs prev day';
-    el.className = 'kpi-sub ' + (diff >= 0 ? 'up' : 'down');
+function renderDashChart(data, idx, monthKey) {
+    const month = data.map((d, i) => ({ d, i })).filter(x => x.d.date.startsWith(monthKey));
+    const avg = sum(month.map(x => x.d), 'sale') / month.length;
+
+    $('dashChartTitle').textContent = 'Daily sales · ' + fmtDate(data[idx].date, { month: 'long', year: 'numeric' });
+    $('dashAvgLegend').textContent = 'Month average ' + fmtCurrency(avg);
+
+    if (dashSalesChart) dashSalesChart.destroy();
+    dashSalesChart = new Chart($('dashSalesChart'), {
+        type: 'bar',
+        data: {
+            labels: month.map(x => parseISODate(x.d.date).getDate()),
+            datasets: [
+                {
+                    type: 'line',
+                    label: 'Month average',
+                    data: month.map(() => avg),
+                    borderColor: C.gold,
+                    borderDash: [6, 4],
+                    borderWidth: 2,
+                    pointRadius: 0,
+                    pointHoverRadius: 0,
+                    order: 0
+                },
+                {
+                    type: 'bar',
+                    label: 'Sales',
+                    data: month.map(x => x.d.sale),
+                    backgroundColor: month.map(x => (x.i === idx ? C.green : C.greenBar)),
+                    hoverBackgroundColor: month.map(x => (x.i === idx ? C.green : C.greenMid)),
+                    borderRadius: 4,
+                    order: 1
+                }
+            ]
+        },
+        options: {
+            interaction: { mode: 'index', intersect: false },
+            plugins: {
+                legend: { display: false },
+                tooltip: {
+                    callbacks: {
+                        title: items => fmtDate(month[items[0].dataIndex].d.date, { weekday: 'short', day: 'numeric', month: 'short' }),
+                        label: moneyTooltip.callbacks.label
+                    }
+                }
+            },
+            scales: { x: noGridX, y: { beginAtZero: true, ticks: { callback: axisMoney, maxTicksLimit: 6 } } },
+            onClick: (evt, els) => {
+                if (!els.length) return;
+                selectedIndex = month[els[0].index].i;
+                renderDashboard();
+            },
+            onHover: (evt, els) => {
+                evt.native.target.style.cursor = els.length ? 'pointer' : 'default';
+            }
+        }
+    });
 }
 
 // ==================== SALES ANALYSIS CHARTS ====================
 let grossNetChart, returnsChart, paymentChart, marginChart, qtyBillsChart, loyaltyChart, stockChart, bankChart, expensesChart;
 
+function lineDataset(label, data, color, fill) {
+    return { label, data, borderColor: color, backgroundColor: fill, fill: true, tension: 0.3, pointRadius: 2, pointHoverRadius: 5, borderWidth: 2 };
+}
+
 function renderSalesCharts() {
     const data = getData();
     if (data.length === 0) return;
 
-    const labels = data.map(d => {
-        const dt = new Date(d.date);
-        return dt.getDate() + '/' + (dt.getMonth() + 1);
-    });
+    const labels = data.map(d => shortLabel(d.date));
 
     // Gross vs Net Sales
     if (grossNetChart) grossNetChart.destroy();
-    grossNetChart = new Chart(document.getElementById('grossNetChart'), {
+    grossNetChart = new Chart($('grossNetChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [
-                {
-                    label: 'Gross Sales',
-                    data: data.map(d => d.sale),
-                    backgroundColor: 'rgba(52,152,219,0.7)',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Net Sales',
-                    data: data.map(d => d.netSales),
-                    backgroundColor: 'rgba(46,204,113,0.7)',
-                    borderRadius: 4
-                }
+                { label: 'Gross sales', data: data.map(d => d.sale), backgroundColor: C.greenBar, borderRadius: 4 },
+                { label: 'Net sales', data: data.map(d => d.netSales), backgroundColor: C.green, borderRadius: 4 }
             ]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+            plugins: { legend: { position: 'bottom' }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
     // Sales Returns
     if (returnsChart) returnsChart.destroy();
-    returnsChart = new Chart(document.getElementById('returnsChart'), {
+    returnsChart = new Chart($('returnsChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [{
                 label: 'Returns',
                 data: data.map(d => d.salesReturns),
-                backgroundColor: data.map(d => d.salesReturns > 5000 ? 'rgba(231,76,60,0.8)' : 'rgba(243,156,18,0.6)'),
+                backgroundColor: data.map(d => (d.salesReturns > 5000 ? C.red : C.redLight)),
                 borderRadius: 4
             }]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(1) + 'K' } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
     // Payment mode split (stacked)
     if (paymentChart) paymentChart.destroy();
-    paymentChart = new Chart(document.getElementById('paymentChart'), {
+    paymentChart = new Chart($('paymentChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [
-                { label: 'Cash', data: data.map(d => d.cashSales), backgroundColor: 'rgba(46,204,113,0.7)', borderRadius: 2 },
-                { label: 'Bank', data: data.map(d => d.bankSales), backgroundColor: 'rgba(52,152,219,0.7)', borderRadius: 2 },
-                { label: 'UPI', data: data.map(d => d.upiSales), backgroundColor: 'rgba(155,89,182,0.7)', borderRadius: 2 }
+                { label: 'Cash', data: data.map(d => d.cashSales), backgroundColor: C.green },
+                { label: 'Card / bank', data: data.map(d => d.bankSales), backgroundColor: C.greenMid },
+                { label: 'UPI', data: data.map(d => d.upiSales), backgroundColor: C.yellow }
             ]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } }
-            }
+            plugins: { legend: { position: 'bottom' }, tooltip: moneyTooltip },
+            scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: axisMoney } } }
         }
     });
 
     // Margin
     if (marginChart) marginChart.destroy();
-    marginChart = new Chart(document.getElementById('marginChart'), {
+    marginChart = new Chart($('marginChart'), {
         type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Margin',
-                data: data.map(d => d.margin),
-                borderColor: '#2ecc71',
-                backgroundColor: 'rgba(46,204,113,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2
-            }]
-        },
+        data: { labels, datasets: [lineDataset('Margin', data.map(d => d.margin), C.green, C.greenFill)] },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(1) + 'K' } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
     // Qty sold (bars) vs bills (line)
     if (qtyBillsChart) qtyBillsChart.destroy();
-    qtyBillsChart = new Chart(document.getElementById('qtyBillsChart'), {
+    qtyBillsChart = new Chart($('qtyBillsChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [
-                { type: 'bar', label: 'Qty Sold', data: data.map(d => d.qtySold), backgroundColor: 'rgba(243,156,18,0.7)', borderRadius: 4 },
-                { type: 'line', label: 'No. of Bills', data: data.map(d => d.bills), borderColor: '#e94560', tension: 0.3, pointRadius: 2 }
+                { type: 'line', label: 'No. of bills', data: data.map(d => d.bills), borderColor: C.green, backgroundColor: C.green, tension: 0.3, pointRadius: 2, borderWidth: 2, order: 0 },
+                { type: 'bar', label: 'Qty sold', data: data.map(d => d.qtySold), backgroundColor: C.yellow, borderRadius: 4, order: 1 }
             ]
         },
         options: {
-            responsive: true,
             plugins: { legend: { position: 'bottom' } },
-            scales: { y: { beginAtZero: true } }
+            scales: { x: noGridX, y: { beginAtZero: true } }
         }
     });
 
     // Loyalty
     if (loyaltyChart) loyaltyChart.destroy();
-    loyaltyChart = new Chart(document.getElementById('loyaltyChart'), {
+    loyaltyChart = new Chart($('loyaltyChart'), {
         type: 'bar',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Loyalty',
-                data: data.map(d => d.loyalty),
-                backgroundColor: 'rgba(155,89,182,0.7)',
-                borderRadius: 4
-            }]
-        },
+        data: { labels, datasets: [{ label: 'Loyalty', data: data.map(d => d.loyalty), backgroundColor: C.gold, borderRadius: 4 }] },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { beginAtZero: true, ticks: { callback: v => '\u20B9' + fmt(v) } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: { beginAtZero: true, ticks: { callback: axisMoney } } }
         }
     });
 
     // Closing Stock
     if (stockChart) stockChart.destroy();
-    stockChart = new Chart(document.getElementById('stockChart'), {
+    stockChart = new Chart($('stockChart'), {
         type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Closing Stock',
-                data: data.map(d => d.closingStock),
-                borderColor: '#9b59b6',
-                backgroundColor: 'rgba(155,89,182,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2
-            }]
-        },
+        data: { labels, datasets: [lineDataset('Closing stock', data.map(d => d.closingStock), C.ink, C.inkFill)] },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 100000).toFixed(1) + 'L' } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
-    // Bank Balance
+    // Closing Bank
     if (bankChart) bankChart.destroy();
-    bankChart = new Chart(document.getElementById('bankChart'), {
+    bankChart = new Chart($('bankChart'), {
         type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Closing Bank',
-                data: data.map(d => d.bankBalance),
-                borderColor: '#3498db',
-                backgroundColor: 'rgba(52,152,219,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 2
-            }]
-        },
+        data: { labels, datasets: [lineDataset('Closing bank', data.map(d => d.bankBalance), C.green, C.greenFill)] },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
-    // Expenses stacked bar
+    // Expenses stacked bar (only days with expenses)
     if (expensesChart) expensesChart.destroy();
     const daysWithExpenses = data.filter(d => d.totalExpenses > 0);
-    const expLabels = daysWithExpenses.map(d => {
-        const dt = new Date(d.date);
-        return dt.getDate() + '/' + (dt.getMonth() + 1);
-    });
-    expensesChart = new Chart(document.getElementById('expensesChart'), {
+    expensesChart = new Chart($('expensesChart'), {
         type: 'bar',
         data: {
-            labels: expLabels,
+            labels: daysWithExpenses.map(d => shortLabel(d.date)),
             datasets: [
-                {
-                    label: 'Salary',
-                    data: daysWithExpenses.map(d => d.salaryPaid),
-                    backgroundColor: 'rgba(231,76,60,0.7)',
-                    borderRadius: 2
-                },
-                {
-                    label: 'Electricity',
-                    data: daysWithExpenses.map(d => d.electricityPaid),
-                    backgroundColor: 'rgba(243,156,18,0.7)',
-                    borderRadius: 2
-                },
-                {
-                    label: 'Admin',
-                    data: daysWithExpenses.map(d => d.adminExpenses),
-                    backgroundColor: 'rgba(155,89,182,0.7)',
-                    borderRadius: 2
-                }
+                { label: 'Salary', data: daysWithExpenses.map(d => d.salaryPaid), backgroundColor: C.ink },
+                { label: 'Electricity', data: daysWithExpenses.map(d => d.electricityPaid), backgroundColor: C.gold },
+                { label: 'Admin', data: daysWithExpenses.map(d => d.adminExpenses), backgroundColor: C.greenMid }
             ]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: {
-                x: { stacked: true },
-                y: { stacked: true, ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } }
-            }
+            plugins: { legend: { position: 'bottom' }, tooltip: moneyTooltip },
+            scales: { x: { stacked: true, grid: { display: false } }, y: { stacked: true, ticks: { callback: axisMoney } } }
         }
     });
 }
@@ -757,58 +910,32 @@ function renderConsolidatedCharts() {
     const labels = consolidatedData.map(d => formatMonth(d.month));
 
     if (monthlyBarChart) monthlyBarChart.destroy();
-    monthlyBarChart = new Chart(document.getElementById('monthlyBarChart'), {
+    monthlyBarChart = new Chart($('monthlyBarChart'), {
         type: 'bar',
         data: {
             labels,
             datasets: [
-                {
-                    label: 'Gross Sales',
-                    data: consolidatedData.map(d => d.sales),
-                    backgroundColor: 'rgba(52,152,219,0.7)',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Net Sales',
-                    data: consolidatedData.map(d => d.netSales),
-                    backgroundColor: 'rgba(46,204,113,0.7)',
-                    borderRadius: 4
-                },
-                {
-                    label: 'Returns',
-                    data: consolidatedData.map(d => d.salesReturn),
-                    backgroundColor: 'rgba(231,76,60,0.7)',
-                    borderRadius: 4
-                }
+                { label: 'Gross sales', data: consolidatedData.map(d => d.sales), backgroundColor: C.greenBar, borderRadius: 4 },
+                { label: 'Net sales', data: consolidatedData.map(d => d.netSales), backgroundColor: C.green, borderRadius: 4 },
+                { label: 'Returns', data: consolidatedData.map(d => d.salesReturn), backgroundColor: C.red, borderRadius: 4 }
             ]
         },
         options: {
-            responsive: true,
-            plugins: { legend: { position: 'bottom' } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 100000).toFixed(1) + 'L' } } }
+            plugins: { legend: { position: 'bottom' }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 
     if (monthlyAvgChart) monthlyAvgChart.destroy();
-    monthlyAvgChart = new Chart(document.getElementById('monthlyAvgChart'), {
+    const avgDataset = lineDataset('Avg daily sale', consolidatedData.map(d => d.avgSales), C.green, C.greenFill);
+    avgDataset.pointRadius = 4;
+    avgDataset.pointBackgroundColor = C.yellow;
+    monthlyAvgChart = new Chart($('monthlyAvgChart'), {
         type: 'line',
-        data: {
-            labels,
-            datasets: [{
-                label: 'Avg Daily Sale',
-                data: consolidatedData.map(d => d.avgSales),
-                borderColor: '#e94560',
-                backgroundColor: 'rgba(233,69,96,0.1)',
-                fill: true,
-                tension: 0.3,
-                pointRadius: 4,
-                pointHoverRadius: 7
-            }]
-        },
+        data: { labels, datasets: [avgDataset] },
         options: {
-            responsive: true,
-            plugins: { legend: { display: false } },
-            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } } }
+            plugins: { legend: { display: false }, tooltip: moneyTooltip },
+            scales: { x: noGridX, y: moneyScale }
         }
     });
 }
@@ -827,39 +954,27 @@ function renderMonthlySummary() {
 
     Object.keys(months).sort().reverse().forEach(key => {
         const entries = months[key];
-        const totalSale = entries.reduce((s, e) => s + e.sale, 0);
-        const avgSale = totalSale / entries.length;
-        const totalBills = entries.reduce((s, e) => s + e.bills, 0);
-        const totalReturns = entries.reduce((s, e) => s + e.salesReturns, 0);
-        const totalNetSales = entries.reduce((s, e) => s + e.netSales, 0);
-        const totalMargin = entries.reduce((s, e) => s + e.margin, 0);
-        const totalCash = entries.reduce((s, e) => s + e.cashSales, 0);
-        const totalBankSales = entries.reduce((s, e) => s + e.bankSales, 0);
-        const totalUpi = entries.reduce((s, e) => s + e.upiSales, 0);
-        const totalQty = entries.reduce((s, e) => s + e.qtySold, 0);
-        const totalLoyalty = entries.reduce((s, e) => s + e.loyalty, 0);
-        const totalExpenses = entries.reduce((s, e) => s + e.totalExpenses, 0);
-        const avgBank = entries.reduce((s, e) => s + e.bankBalance, 0) / entries.length;
-
-        const [y, m] = key.split('-');
-        const monthName = new Date(y, m - 1).toLocaleDateString('en-IN', { month: 'long', year: 'numeric' });
+        const totalSale = sum(entries, 'sale');
+        const totalReturns = sum(entries, 'salesReturns');
+        const totalExpenses = sum(entries, 'totalExpenses');
+        const monthName = fmtDate(key + '-01', { month: 'long', year: 'numeric' });
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${monthName}</td>
+            <td><strong>${monthName}</strong></td>
             <td>${fmtCurrency(totalSale)}</td>
-            <td>${fmtCurrency(avgSale)}</td>
-            <td>${fmt(totalBills)}</td>
+            <td>${fmtCurrency(totalSale / entries.length)}</td>
+            <td>${fmt(sum(entries, 'bills'))}</td>
             <td class="${totalReturns > 50000 ? 'text-danger' : ''}">${fmtCurrency(totalReturns)}</td>
-            <td>${fmtCurrency(totalNetSales)}</td>
-            <td>${fmtCurrency(totalMargin)}</td>
-            <td>${fmtCurrency(totalCash)}</td>
-            <td>${fmtCurrency(totalBankSales)}</td>
-            <td>${fmtCurrency(totalUpi)}</td>
-            <td>${fmt(totalQty)}</td>
-            <td>${fmtCurrency(totalLoyalty)}</td>
+            <td>${fmtCurrency(sum(entries, 'netSales'))}</td>
+            <td>${fmtCurrency(sum(entries, 'margin'))}</td>
+            <td>${fmtCurrency(sum(entries, 'cashSales'))}</td>
+            <td>${fmtCurrency(sum(entries, 'bankSales'))}</td>
+            <td>${fmtCurrency(sum(entries, 'upiSales'))}</td>
+            <td>${fmt(sum(entries, 'qtySold'))}</td>
+            <td>${fmtCurrency(sum(entries, 'loyalty'))}</td>
             <td class="${totalExpenses > 200000 ? 'text-danger' : ''}">${fmtCurrency(totalExpenses)}</td>
-            <td>${fmtCurrency(avgBank)}</td>
+            <td>${fmtCurrency(sum(entries, 'bankBalance') / entries.length)}</td>
         `;
         tbody.appendChild(tr);
     });
@@ -872,7 +987,7 @@ function renderConsolidatedTable() {
     consolidatedData.forEach(d => {
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${formatMonth(d.month)}</td>
+            <td><strong>${formatMonth(d.month)}</strong></td>
             <td>${fmt(d.days)}</td>
             <td>${fmtCurrency(d.sales)}</td>
             <td class="${d.salesReturn > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.salesReturn)}</td>
@@ -884,57 +999,89 @@ function renderConsolidatedTable() {
 }
 
 // ==================== RECORDS TABLE ====================
+let recordFilter = 'all';
+
+const RECORD_FILTERS = {
+    all: () => true,
+    ret: d => d.salesReturns > 5000,
+    exp: d => d.totalExpenses > 0,
+    txn: d => d.internalTxn !== 0
+};
+
+function setRecordFilter(filter) {
+    recordFilter = filter;
+    document.querySelectorAll('#recordChips .chip').forEach(chip => {
+        chip.setAttribute('aria-pressed', String(chip.dataset.filter === filter));
+    });
+    renderRecordsTable();
+}
+
 function renderRecordsTable() {
     const data = getData();
     const tbody = document.querySelector('#recordsTable tbody');
     tbody.innerHTML = '';
 
-    const monthFilter = document.getElementById('filterMonth');
+    const monthFilter = $('filterMonth');
     const currentVal = monthFilter.value;
     const months = [...new Set(data.map(d => d.date.substring(0, 7)))].sort().reverse();
-    monthFilter.innerHTML = '<option value="">All Months</option>';
+    monthFilter.innerHTML = '<option value="">All months</option>';
     months.forEach(m => {
-        const [y, mo] = m.split('-');
-        const name = new Date(y, mo - 1).toLocaleDateString('en-IN', { month: 'short', year: 'numeric' });
+        const name = fmtDate(m + '-01', { month: 'short', year: 'numeric' });
         monthFilter.innerHTML += `<option value="${m}" ${m === currentVal ? 'selected' : ''}>${name}</option>`;
     });
 
-    let filtered = data.slice().reverse();
-
-    const search = document.getElementById('searchRecords').value.toLowerCase();
+    const search = $('searchRecords').value.trim().toLowerCase();
     const monthVal = monthFilter.value;
-    if (search) filtered = filtered.filter(d => d.date.includes(search));
+    const longLabel = d => fmtDate(d, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' }).toLowerCase();
+
+    let filtered = data.slice().reverse();
     if (monthVal) filtered = filtered.filter(d => d.date.startsWith(monthVal));
+    if (search) filtered = filtered.filter(d => d.date.includes(search) || longLabel(d.date).includes(search));
+    filtered = filtered.filter(RECORD_FILTERS[recordFilter]);
+
+    $('rec-count').textContent = filtered.length + (filtered.length === 1 ? ' day' : ' days') + ' shown';
+    $('rec-sale').textContent = fmtCurrency(sum(filtered, 'sale'));
+    $('rec-net').textContent = fmtCurrency(sum(filtered, 'netSales'));
+    $('rec-margin').textContent = fmtCurrency(sum(filtered, 'margin'));
+    $('rec-returns').textContent = fmtCurrency(sum(filtered, 'salesReturns'));
+    $('rec-exp').textContent = fmtCurrency(sum(filtered, 'totalExpenses'));
+
+    if (!filtered.length) {
+        tbody.innerHTML = '<tr class="empty-row"><td colspan="17">No records match these filters.</td></tr>';
+        return;
+    }
+
+    const money = n => (n ? fmtCurrency(n) : '<span class="nil">—</span>');
 
     filtered.forEach(d => {
-        let txHtml = '--';
-        if (d.internalTxn > 0) txHtml = `<span class="tx-in">+${fmtCurrency(d.internalTxn)}</span>`;
-        else if (d.internalTxn < 0) txHtml = `<span class="tx-out">-${fmtCurrency(Math.abs(d.internalTxn))}</span>`;
+        let txHtml = '<span class="nil">—</span>';
+        if (d.internalTxn > 0) txHtml = `<span class="tx-in">+${fmtCurrency(d.internalTxn)} in</span>`;
+        else if (d.internalTxn < 0) txHtml = `<span class="tx-out">−${fmtCurrency(Math.abs(d.internalTxn))} out</span>`;
+
+        const label = fmtDate(d.date, { weekday: 'short', day: 'numeric', month: 'short', year: 'numeric' });
+        const expTitle = 'Salary ' + fmtCurrency(d.salaryPaid) + ' · Electricity ' + fmtCurrency(d.electricityPaid) + ' · Admin ' + fmtCurrency(d.adminExpenses);
 
         const tr = document.createElement('tr');
         tr.innerHTML = `
-            <td>${d.date}</td>
-            <td>${fmtCurrency(d.sale)}</td>
-            <td>${d.bills}</td>
-            <td class="${d.salesReturns > 5000 ? 'text-danger' : ''}">${fmtCurrency(d.salesReturns)}</td>
+            <td><span class="wd">${fmtDate(d.date, { weekday: 'short' })}</span>${fmtDate(d.date, { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+            <td class="g"><strong>${fmtCurrency(d.sale)}</strong></td>
+            <td>${fmt(d.bills)}</td>
+            <td class="${d.salesReturns > 5000 ? 'text-danger' : ''}">${money(d.salesReturns)}</td>
             <td>${fmtCurrency(d.netSales)}</td>
             <td>${fmt(d.qtySold)}</td>
-            <td>${fmtCurrency(d.margin)}</td>
-            <td>${fmtCurrency(d.cashSales)}</td>
-            <td>${fmtCurrency(d.bankSales)}</td>
-            <td>${fmtCurrency(d.upiSales)}</td>
-            <td>${fmtCurrency(d.loyalty)}</td>
-            <td>${fmtLakhs(d.closingStock)}</td>
+            <td>${money(d.margin)}</td>
+            <td class="g">${money(d.cashSales)}</td>
+            <td>${money(d.bankSales)}</td>
+            <td>${money(d.upiSales)}</td>
+            <td>${money(d.loyalty)}</td>
+            <td class="g">${fmtLakhs(d.closingStock)}</td>
             <td>${fmtCurrency(d.bankBalance)}</td>
             <td>${txHtml}</td>
-            <td>${fmtCurrency(d.ordersPlaced)}</td>
-            <td>${fmtCurrency(d.salaryPaid)}</td>
-            <td>${fmtCurrency(d.electricityPaid)}</td>
-            <td>${fmtCurrency(d.adminExpenses)}</td>
-            <td class="${d.totalExpenses > 100000 ? 'text-danger' : ''}">${fmtCurrency(d.totalExpenses)}</td>
-            <td>
-                <button class="btn-edit" onclick="editEntry('${d.date}')">Edit</button>
-                <button class="btn-delete" onclick="deleteEntry('${d.date}')">Del</button>
+            <td>${money(d.ordersPlaced)}</td>
+            <td class="g ${d.totalExpenses > 100000 ? 'text-danger' : ''}" title="${d.totalExpenses ? expTitle : ''}">${money(d.totalExpenses)}</td>
+            <td class="g actions">
+                <button type="button" class="icon-btn" onclick="editEntry('${d.date}')" aria-label="Edit ${label}" title="Edit">${ICON_EDIT}</button>
+                <button type="button" class="icon-btn danger" onclick="deleteEntry('${d.date}')" aria-label="Delete ${label}" title="Delete">${ICON_TRASH}</button>
             </td>
         `;
         tbody.appendChild(tr);
@@ -953,22 +1100,22 @@ function exportData() {
         return;
     }
 
-    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Qty Sold', 'Margin', 'Cash', 'Bank', 'UPI', 'Loyalty', 'Closing Stock', 'Closing Bank', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
+    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Qty Sold', 'Margin', 'Cash', 'Bank', 'UPI', 'Loyalty', 'Closing Stock', 'Closing Bank', 'Int. Transaction', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
     const rows = data.map(d => [
         d.date, d.sale, d.bills, d.salesReturns, d.netSales,
         d.qtySold, d.margin, d.cashSales, d.bankSales, d.upiSales, d.loyalty,
-        d.closingStock, d.bankBalance, d.ordersPlaced,
+        d.closingStock, d.bankBalance, d.internalTxn, d.ordersPlaced,
         d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses
     ]);
 
     let csv = headers.join(',') + '\n';
-    rows.forEach(r => csv += r.join(',') + '\n');
+    rows.forEach(r => { csv += r.join(',') + '\n'; });
 
     const blob = new Blob([csv], { type: 'text/csv' });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
-    a.download = 'ramraj_daily_collection_' + new Date().toISOString().split('T')[0] + '.csv';
+    a.download = 'ramraj_daily_collection_' + todayISO() + '.csv';
     a.click();
     URL.revokeObjectURL(url);
 }
@@ -977,9 +1124,10 @@ function exportData() {
 async function init() {
     showLoading();
     await fetchData();
+    updateEntrySummary();
     renderDashboard();
     hideLoading();
-    console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly + ' + internalTransactions.length + ' internal transaction records.');
+    console.log('Supabase connected. Loaded ' + appData.length + ' daily + ' + consolidatedData.length + ' monthly records.');
 }
 
 init();

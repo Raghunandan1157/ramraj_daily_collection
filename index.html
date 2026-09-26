@@ -3,291 +3,422 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#1E4D2B">
     <title>Ramraj Daily Collection</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link rel="stylesheet" href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,500;12..96,700&family=IBM+Plex+Sans:wght@400;500;600&display=swap">
     <link rel="stylesheet" href="style.css">
     <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js"></script>
     <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2/dist/umd/supabase.min.js"></script>
 </head>
-<body>
+<body data-page="dashboard">
     <!-- Loading Overlay -->
-    <div class="loading-overlay" id="loadingOverlay">
+    <div class="loading-overlay" id="loadingOverlay" role="status" aria-live="polite">
         <div class="spinner"></div>
-        <p>Loading data from Supabase...</p>
+        <p>Loading data from Supabase…</p>
     </div>
 
     <!-- Sidebar -->
-    <nav class="sidebar" id="sidebar">
+    <nav class="sidebar" id="sidebar" aria-label="Main">
         <div class="sidebar-header">
             <img src="logo.png" alt="Ramraj" class="sidebar-logo">
-            <span class="subtitle">Daily Collection</span>
+            <span class="subtitle">Daily collection</span>
         </div>
         <ul class="nav-links">
-            <li class="active" data-page="dashboard">
-                <span class="icon">&#9632;</span> Dashboard
+            <li>
+                <button type="button" class="nav-link active" data-page="dashboard" aria-current="page">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+                    Dashboard
+                </button>
             </li>
-            <li data-page="entry">
-                <span class="icon">&#9998;</span> Data Entry
+            <li>
+                <button type="button" class="nav-link" data-page="entry">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4Z"/></svg>
+                    Daily entry
+                </button>
             </li>
-            <li data-page="sales">
-                <span class="icon">&#9650;</span> Sales Analysis
+            <li>
+                <button type="button" class="nav-link" data-page="sales">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
+                    Sales analysis
+                </button>
             </li>
-            <li data-page="consolidated">
-                <span class="icon">&#9673;</span> Monthly Overview
+            <li>
+                <button type="button" class="nav-link" data-page="consolidated">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="5" width="18" height="16" rx="2"/><path d="M16 3v4M8 3v4M3 10h18"/></svg>
+                    Monthly overview
+                </button>
             </li>
-            <li data-page="records">
-                <span class="icon">&#9776;</span> All Records
+            <li>
+                <button type="button" class="nav-link" data-page="records">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18M3 12h18M3 19h18"/></svg>
+                    All records
+                </button>
             </li>
         </ul>
         <div class="sidebar-footer">
-            <button class="btn-export" onclick="exportData()">Export CSV</button>
+            <button type="button" class="btn-export" onclick="exportData()">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+                Export CSV
+            </button>
+            <span class="sync-status" id="syncStatus">Connecting to Supabase…</span>
         </div>
     </nav>
+    <div class="sidebar-backdrop" id="sidebarBackdrop" onclick="closeSidebar()"></div>
 
     <!-- Main Content -->
     <main class="main-content">
         <!-- Top Bar -->
         <header class="top-bar">
-            <button class="menu-toggle" onclick="toggleSidebar()">&#9776;</button>
-            <h1 id="page-title">Dashboard</h1>
+            <div class="top-left">
+                <button type="button" class="menu-toggle" id="menuToggle" onclick="toggleSidebar()" aria-label="Open menu" aria-expanded="false" aria-controls="sidebar">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 6h18M3 12h18M3 18h18"/></svg>
+                </button>
+                <div class="title-block">
+                    <span class="eyebrow" id="current-date"></span>
+                    <h1 id="page-title">Dashboard</h1>
+                </div>
+            </div>
             <div class="top-right">
-                <button class="btn-refresh" onclick="refreshData()" title="Refresh data">&#8635;</button>
-                <span id="current-date"></span>
+                <div class="day-switcher" role="group" aria-label="Report day">
+                    <button type="button" id="dayPrev" onclick="shiftDay(-1)" aria-label="Previous day">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m15 18-6-6 6-6"/></svg>
+                    </button>
+                    <span id="dayLabel" aria-live="polite">--</span>
+                    <button type="button" id="dayNext" onclick="shiftDay(1)" aria-label="Next day">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><path d="m9 18 6-6-6-6"/></svg>
+                    </button>
+                </div>
+                <button type="button" class="btn-icon" onclick="refreshData()" aria-label="Refresh data" title="Refresh data">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M21 12a9 9 0 1 1-2.6-6.4"/><path d="M21 3v6h-6"/></svg>
+                </button>
+                <button type="button" class="btn-primary" id="btnAddEntry" onclick="showPage('entry')">
+                    <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg>
+                    Add today's entry
+                </button>
             </div>
         </header>
 
         <!-- Dashboard Page -->
         <section class="page active" id="page-dashboard">
-            <div class="date-range-bar" id="dateRangeBar"></div>
-            <!-- KPI Cards -->
-            <div class="kpi-grid">
-                <div class="kpi-card">
-                    <div class="kpi-label">Today's Sale</div>
-                    <div class="kpi-value" id="kpi-sale">--</div>
-                    <div class="kpi-sub" id="kpi-sale-sub"></div>
+            <div class="banner hidden" id="todayBanner" role="status">
+                <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="12" cy="12" r="9"/><path d="M12 7v6M12 16.5v.5"/></svg>
+                <span id="todayBannerText"></span>
+                <button type="button" class="link-btn" onclick="showPage('entry')">Add entry</button>
+            </div>
+
+            <!-- Sales -->
+            <div class="grid-4" aria-label="Sales">
+                <div class="card hero span-2">
+                    <div class="hero-main">
+                        <span class="card-label" id="kpi-sale-label">Gross sales</span>
+                        <div class="hero-value-row">
+                            <span class="kpi-value xl" id="kpi-sale">--</span>
+                            <span class="delta" id="kpi-sale-sub"></span>
+                        </div>
+                        <div class="hero-stats">
+                            <span><strong id="kpi-bills">--</strong> bills</span>
+                            <span><strong id="kpi-avgbill">--</strong> avg bill</span>
+                            <span><strong id="kpi-qty">--</strong> pcs sold</span>
+                        </div>
+                    </div>
+                    <div class="hero-divider"></div>
+                    <div class="hero-side">
+                        <span class="card-label" id="kpi-mtd-label">Month to date</span>
+                        <span class="kpi-value md" id="kpi-mtd">--</span>
+                        <span class="kpi-sub" id="kpi-mtd-sub"></span>
+                    </div>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Net Sales</div>
-                    <div class="kpi-value" id="kpi-netsales">--</div>
-                    <div class="kpi-sub" id="kpi-netsales-sub"></div>
+                <div class="card">
+                    <span class="card-label">Net sales</span>
+                    <span class="kpi-value" id="kpi-netsales">--</span>
+                    <span class="kpi-sub" id="kpi-returns"></span>
                 </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">No. of Bills</div>
-                    <div class="kpi-value" id="kpi-bills">--</div>
-                    <div class="kpi-sub" id="kpi-bills-sub"></div>
-                </div>
-                <div class="kpi-card highlight-red">
-                    <div class="kpi-label">Sales Returns</div>
-                    <div class="kpi-value" id="kpi-returns">--</div>
-                    <div class="kpi-sub" id="kpi-returns-sub"></div>
-                </div>
-                <div class="kpi-card accent">
-                    <div class="kpi-label">Closing Stock</div>
-                    <div class="kpi-value" id="kpi-stock">--</div>
-                    <div class="kpi-sub" id="kpi-stock-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Closing Bank</div>
-                    <div class="kpi-value" id="kpi-bank">--</div>
-                    <div class="kpi-sub" id="kpi-bank-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Margin</div>
-                    <div class="kpi-value" id="kpi-margin">--</div>
-                    <div class="kpi-sub" id="kpi-margin-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Cash</div>
-                    <div class="kpi-value" id="kpi-cash">--</div>
-                    <div class="kpi-sub" id="kpi-cash-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Bank</div>
-                    <div class="kpi-value" id="kpi-banksales">--</div>
-                    <div class="kpi-sub" id="kpi-banksales-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">UPI</div>
-                    <div class="kpi-value" id="kpi-upi">--</div>
-                    <div class="kpi-sub" id="kpi-upi-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Qty Sold</div>
-                    <div class="kpi-value" id="kpi-qty">--</div>
-                    <div class="kpi-sub" id="kpi-qty-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Loyalty</div>
-                    <div class="kpi-value" id="kpi-loyalty">--</div>
-                    <div class="kpi-sub" id="kpi-loyalty-sub"></div>
-                </div>
-                <div class="kpi-card">
-                    <div class="kpi-label">Orders Placed</div>
-                    <div class="kpi-value" id="kpi-orders">--</div>
-                    <div class="kpi-sub" id="kpi-orders-sub"></div>
-                </div>
-                <div class="kpi-card highlight-red">
-                    <div class="kpi-label">Total Expenses</div>
-                    <div class="kpi-value" id="kpi-expenses">--</div>
-                    <div class="kpi-sub" id="kpi-expenses-sub"></div>
+                <div class="card">
+                    <span class="card-label">Margin</span>
+                    <span class="kpi-value" id="kpi-margin">--</span>
+                    <span class="kpi-sub" id="kpi-margin-sub"></span>
+                    <div class="meter"><span id="kpi-margin-meter"></span></div>
                 </div>
             </div>
 
-            <!-- Charts Row -->
-            <div class="charts-row">
-                <div class="chart-card wide">
-                    <h3>Daily Sales Trend</h3>
-                    <canvas id="dashSalesChart"></canvas>
+            <!-- Money -->
+            <div class="grid-4" aria-label="Money">
+                <div class="card span-2">
+                    <div class="card-head">
+                        <h2>How customers paid</h2>
+                        <span class="check none" id="payCheck"></span>
+                    </div>
+                    <div class="split-bar">
+                        <span class="seg seg-cash" id="payBarCash"></span>
+                        <span class="seg seg-bank" id="payBarBank"></span>
+                        <span class="seg seg-upi" id="payBarUpi"></span>
+                    </div>
+                    <div class="pay-legend">
+                        <div>
+                            <span class="legend-key"><i class="swatch cash"></i>Cash</span>
+                            <span class="pay-amt" id="kpi-cash">--</span>
+                            <span class="pay-pct" id="kpi-cash-sub"></span>
+                        </div>
+                        <div>
+                            <span class="legend-key"><i class="swatch bank"></i>Card / bank</span>
+                            <span class="pay-amt" id="kpi-banksales">--</span>
+                            <span class="pay-pct" id="kpi-banksales-sub"></span>
+                        </div>
+                        <div>
+                            <span class="legend-key"><i class="swatch upi"></i>UPI</span>
+                            <span class="pay-amt" id="kpi-upi">--</span>
+                            <span class="pay-pct" id="kpi-upi-sub"></span>
+                        </div>
+                    </div>
+                    <div class="card-foot rule">Loyalty redeemed <strong id="kpi-loyalty">--</strong></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Closing Bank Trend</h3>
-                    <canvas id="dashBankChart"></canvas>
+                <div class="card">
+                    <span class="card-label">Closing bank</span>
+                    <span class="kpi-value sm" id="kpi-bank">--</span>
+                    <span class="kpi-sub" id="kpi-bank-sub"></span>
+                    <span class="chip-tag hidden" id="kpi-txn"></span>
+                </div>
+                <div class="card">
+                    <span class="card-label">Closing stock</span>
+                    <span class="kpi-value sm" id="kpi-stock">--</span>
+                    <span class="kpi-sub" id="kpi-stock-sub"></span>
+                    <div class="card-foot">
+                        Orders placed <strong id="kpi-orders">--</strong><br>
+                        This month <strong id="kpi-orders-mtd">--</strong>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Trends -->
+            <div class="grid-4" aria-label="Trends">
+                <div class="card span-3">
+                    <div class="card-head">
+                        <h2 id="dashChartTitle">Daily sales</h2>
+                        <div class="chart-legend">
+                            <span><i class="swatch day"></i>Day</span>
+                            <span><i class="swatch cash"></i>Selected day</span>
+                            <span><i class="swatch avg"></i><span id="dashAvgLegend">Month average</span></span>
+                        </div>
+                    </div>
+                    <div class="chart-box"><canvas id="dashSalesChart" aria-label="Daily sales for the month; click a bar to open that day" role="img"></canvas></div>
+                </div>
+                <div class="card">
+                    <h2 id="exp-title">Expenses</h2>
+                    <span class="kpi-value md danger" id="kpi-expenses-mtd">--</span>
+                    <div class="exp-rows">
+                        <div class="exp-row">
+                            <div class="exp-row-head"><span>Salary</span><strong id="exp-salary">--</strong></div>
+                            <div class="meter dark"><span id="exp-salary-bar"></span></div>
+                        </div>
+                        <div class="exp-row">
+                            <div class="exp-row-head"><span>Electricity</span><strong id="exp-electricity">--</strong></div>
+                            <div class="meter dark"><span id="exp-electricity-bar"></span></div>
+                        </div>
+                        <div class="exp-row">
+                            <div class="exp-row-head"><span>Admin</span><strong id="exp-admin">--</strong></div>
+                            <div class="meter dark"><span id="exp-admin-bar"></span></div>
+                        </div>
+                    </div>
+                    <span class="card-foot" id="kpi-expenses-today"></span>
                 </div>
             </div>
         </section>
 
         <!-- Data Entry Page -->
         <section class="page" id="page-entry">
-            <div class="form-card">
-                <h2>Daily Report Entry</h2>
-                <form id="entryForm" onsubmit="return saveEntry(event)">
-                    <div class="form-grid">
-                        <div class="form-group">
-                            <label for="f-date">Date</label>
-                            <input type="date" id="f-date" required>
+            <div class="entry-layout">
+                <form id="entryForm" class="entry-form" onsubmit="return saveEntry(event)" aria-label="Daily report">
+                    <div class="card date-row">
+                        <div class="form-group date-group">
+                            <label for="f-date">Report date</label>
+                            <div class="field"><input type="date" id="f-date" required></div>
                         </div>
-                        <div class="form-group">
-                            <label for="f-sales">Sales (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-sales" placeholder="e.g. 38246" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-bills">No. of Bills</label>
-                            <input type="number" id="f-bills" placeholder="e.g. 17" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-returns">Sales Returns (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-returns" placeholder="e.g. 495" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-netsales">Net Sales (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-netsales" placeholder="Auto-calculated" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-qty">Qty Sold</label>
-                            <input type="number" id="f-qty" placeholder="e.g. 42" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-margin">Margin (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-margin" placeholder="e.g. 6120" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-cash">Cash (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-cash" placeholder="e.g. 20000" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-banksales">Bank (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-banksales" placeholder="Card / bank transfer" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-upi">UPI (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-upi" placeholder="e.g. 18246" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-loyalty">Loyalty (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-loyalty" placeholder="Loyalty amount" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-stock">Closing Stock (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-stock" placeholder="e.g. 6587044" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-bank">Closing Bank (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-bank" placeholder="e.g. 236005.83" required>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-orders">Orders Placed Amount (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-orders" placeholder="e.g. 239018" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-salary">Salary Paid (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-salary" placeholder="e.g. 101715" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-electricity">Electricity Paid (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-electricity" placeholder="e.g. 29402" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-admin">Admin Expenses (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-admin" placeholder="e.g. 3950" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label for="f-totalexp">Total Expenses (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-totalexp" placeholder="Auto-calculated" readonly>
-                        </div>
-                        <div class="form-group">
-                            <label for="f-intxn">Int. Transaction (&#8377;)</label>
-                            <input type="number" step="0.01" id="f-intxn" placeholder="Amount (0 = none)" value="0">
-                        </div>
-                        <div class="form-group">
-                            <label>Direction</label>
-                            <div class="direction-toggle">
-                                <button type="button" id="btn-dir-in" class="dir-btn dir-btn-in" onclick="selectDirection('IN')">IN</button>
-                                <button type="button" id="btn-dir-out" class="dir-btn dir-btn-out" onclick="selectDirection('OUT')">OUT</button>
+                        <span class="edit-badge hidden" id="editBadge"></span>
+                    </div>
+
+                    <section class="card form-section">
+                        <div class="section-head"><h2>1 · Sales</h2><span class="hint">From the billing counter summary</span></div>
+                        <div class="form-grid cols-3">
+                            <div class="form-group">
+                                <label for="f-sales">Gross sales</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-sales" placeholder="38246" required></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-bills">No. of bills</label>
+                                <div class="field"><input type="number" min="0" inputmode="numeric" id="f-bills" placeholder="17" required></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-returns">Sales returns</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-returns" value="0"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-qty">Qty sold</label>
+                                <div class="field"><input type="number" min="0" inputmode="numeric" id="f-qty" value="0"><span class="suffix" aria-hidden="true">pcs</span></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-margin">Margin</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" inputmode="decimal" id="f-margin" value="0"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-netsales">Net sales</label>
+                                <div class="field readonly"><span class="prefix" aria-hidden="true">₹</span><input type="number" id="f-netsales" placeholder="Auto-calculated" readonly tabindex="-1"></div>
                             </div>
                         </div>
+                    </section>
+
+                    <section class="card form-section">
+                        <div class="section-head"><h2>2 · Payment received</h2><span class="hint">Cash + Card/bank + UPI should equal gross sales</span></div>
+                        <div class="form-grid cols-4">
+                            <div class="form-group">
+                                <label for="f-cash">Cash</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-cash" value="0"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-banksales">Card / bank</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-banksales" value="0"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-upi">UPI</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-upi" value="0"></div>
+                            </div>
+                            <div class="form-group">
+                                <label for="f-loyalty">Loyalty redeemed</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-loyalty" value="0"></div>
+                            </div>
+                        </div>
+                        <div class="reconcile">
+                            <div class="reconcile-head">
+                                <span id="payAccounted"></span>
+                                <span class="check none" id="payStatus" aria-live="polite"></span>
+                            </div>
+                            <div class="split-bar thin">
+                                <span class="seg seg-cash" id="entryBarCash"></span>
+                                <span class="seg seg-bank" id="entryBarBank"></span>
+                                <span class="seg seg-upi" id="entryBarUpi"></span>
+                            </div>
+                        </div>
+                    </section>
+
+                    <div class="form-grid cols-2">
+                        <section class="card form-section">
+                            <h2>3 · Closing position</h2>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="f-stock">Closing stock</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-stock" placeholder="6587044" required></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="f-bank">Closing bank balance</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" inputmode="decimal" id="f-bank" placeholder="236005.83" required></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="f-orders">Orders placed with suppliers</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-orders" value="0"></div>
+                                </div>
+                            </div>
+                        </section>
+                        <section class="card form-section">
+                            <h2>4 · Paid out today</h2>
+                            <div class="form-grid">
+                                <div class="form-group">
+                                    <label for="f-salary">Salary</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-salary" value="0"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="f-electricity">Electricity</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-electricity" value="0"></div>
+                                </div>
+                                <div class="form-group">
+                                    <label for="f-admin">Admin expenses</label>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-admin" value="0"></div>
+                                </div>
+                            </div>
+                        </section>
                     </div>
-                    <div class="form-actions">
-                        <button type="submit" class="btn-primary" id="submitBtn">Save Entry</button>
-                        <button type="button" class="btn-secondary" onclick="resetForm()">Clear</button>
-                    </div>
+
+                    <section class="card form-section">
+                        <div class="section-head"><h2>5 · Internal transfer</h2><span class="hint">Money moved between the store and the company account. Leave at 0 if none.</span></div>
+                        <div class="transfer-row">
+                            <div class="form-group">
+                                <label for="f-intxn">Amount</label>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-intxn" value="0"></div>
+                            </div>
+                            <div class="direction-toggle" role="group" aria-label="Direction">
+                                <button type="button" id="btn-dir-in" class="dir-btn dir-btn-in" aria-pressed="false" onclick="selectDirection('IN')">In · received</button>
+                                <button type="button" id="btn-dir-out" class="dir-btn dir-btn-out" aria-pressed="false" onclick="selectDirection('OUT')">Out · sent</button>
+                            </div>
+                        </div>
+                    </section>
                 </form>
+
+                <aside class="summary" aria-label="Summary">
+                    <div class="card">
+                        <h2>Summary</h2>
+                        <div class="sum-list">
+                            <div class="sum-row"><span>Net sales</span><strong id="sum-net">--</strong></div>
+                            <div class="sum-row"><span>Avg bill value</span><strong id="sum-avgbill">--</strong></div>
+                            <div class="sum-row"><span>Margin</span><strong id="sum-margin">--</strong></div>
+                            <div class="sum-row"><span>Returns</span><strong id="sum-returns">--</strong></div>
+                            <div class="sum-rule"></div>
+                            <div class="sum-row"><span>Paid out</span><strong class="danger" id="sum-exp">--</strong></div>
+                            <div class="sum-row"><span>Transfer</span><strong id="sum-txn">--</strong></div>
+                        </div>
+                        <div class="alert hidden" id="sumAlert" role="alert"></div>
+                        <button type="submit" form="entryForm" class="btn-primary block" id="submitBtn">Save entry</button>
+                        <button type="button" class="btn-secondary block" onclick="resetForm()">Clear form</button>
+                        <div id="entry-message" class="message hidden" role="status"></div>
+                    </div>
+                    <p class="hint">Net sales, the payment check and totals update as you type.</p>
+                </aside>
             </div>
-            <div id="entry-message" class="message hidden"></div>
         </section>
 
         <!-- Sales Analysis Page -->
         <section class="page" id="page-sales">
             <div class="charts-row">
-                <div class="chart-card wide">
-                    <h3>Gross Sales vs Net Sales</h3>
-                    <canvas id="grossNetChart"></canvas>
+                <div class="card chart-card wide">
+                    <h3>Gross sales vs net sales</h3>
+                    <div class="chart-box"><canvas id="grossNetChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Sales Returns Trend</h3>
-                    <canvas id="returnsChart"></canvas>
-                </div>
-            </div>
-            <div class="charts-row">
-                <div class="chart-card wide">
-                    <h3>Payment Mode Split (Cash / Bank / UPI)</h3>
-                    <canvas id="paymentChart"></canvas>
-                </div>
-                <div class="chart-card">
-                    <h3>Margin Trend</h3>
-                    <canvas id="marginChart"></canvas>
+                <div class="card chart-card">
+                    <h3>Sales returns</h3>
+                    <div class="chart-box"><canvas id="returnsChart"></canvas></div>
                 </div>
             </div>
             <div class="charts-row">
-                <div class="chart-card wide">
-                    <h3>Qty Sold &amp; No. of Bills</h3>
-                    <canvas id="qtyBillsChart"></canvas>
+                <div class="card chart-card wide">
+                    <h3>How customers paid (Cash / Card / UPI)</h3>
+                    <div class="chart-box"><canvas id="paymentChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Loyalty Trend</h3>
-                    <canvas id="loyaltyChart"></canvas>
+                <div class="card chart-card">
+                    <h3>Margin</h3>
+                    <div class="chart-box"><canvas id="marginChart"></canvas></div>
                 </div>
             </div>
             <div class="charts-row">
-                <div class="chart-card">
-                    <h3>Closing Stock Trend</h3>
-                    <canvas id="stockChart"></canvas>
+                <div class="card chart-card wide">
+                    <h3>Qty sold &amp; no. of bills</h3>
+                    <div class="chart-box"><canvas id="qtyBillsChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Closing Bank Trend</h3>
-                    <canvas id="bankChart"></canvas>
+                <div class="card chart-card">
+                    <h3>Loyalty redeemed</h3>
+                    <div class="chart-box"><canvas id="loyaltyChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Expenses Breakdown</h3>
-                    <canvas id="expensesChart"></canvas>
+            </div>
+            <div class="charts-row">
+                <div class="card chart-card">
+                    <h3>Closing stock</h3>
+                    <div class="chart-box"><canvas id="stockChart"></canvas></div>
+                </div>
+                <div class="card chart-card">
+                    <h3>Closing bank</h3>
+                    <div class="chart-box"><canvas id="bankChart"></canvas></div>
+                </div>
+                <div class="card chart-card">
+                    <h3>Expenses breakdown</h3>
+                    <div class="chart-box"><canvas id="expensesChart"></canvas></div>
                 </div>
             </div>
         </section>
@@ -295,55 +426,53 @@
         <!-- Monthly Overview Page -->
         <section class="page" id="page-consolidated">
             <div class="charts-row">
-                <div class="chart-card wide">
-                    <h3>Monthly Sales from Consolidated Data</h3>
-                    <canvas id="monthlyBarChart"></canvas>
+                <div class="card chart-card wide">
+                    <h3>Monthly sales (consolidated)</h3>
+                    <div class="chart-box"><canvas id="monthlyBarChart"></canvas></div>
                 </div>
-                <div class="chart-card">
-                    <h3>Monthly Avg Daily Sale</h3>
-                    <canvas id="monthlyAvgChart"></canvas>
+                <div class="card chart-card">
+                    <h3>Average daily sale by month</h3>
+                    <div class="chart-box"><canvas id="monthlyAvgChart"></canvas></div>
                 </div>
             </div>
-            <!-- Summary Table -->
-            <div class="table-card">
-                <h3>Monthly Summary (from Daily Data)</h3>
+            <div class="card table-card">
+                <h3>Monthly summary (from daily data)</h3>
                 <div class="table-wrapper">
                     <table id="monthlySummaryTable">
                         <thead>
                             <tr>
-                                <th>Month</th>
-                                <th>Total Sales</th>
-                                <th>Avg Daily Sale</th>
-                                <th>Total Bills</th>
-                                <th>Total Returns</th>
-                                <th>Net Sales</th>
-                                <th>Margin</th>
-                                <th>Cash</th>
-                                <th>Bank</th>
-                                <th>UPI</th>
-                                <th>Qty Sold</th>
-                                <th>Loyalty</th>
-                                <th>Total Expenses</th>
-                                <th>Avg Closing Bank</th>
+                                <th scope="col">Month</th>
+                                <th scope="col">Total sales</th>
+                                <th scope="col">Avg daily sale</th>
+                                <th scope="col">Total bills</th>
+                                <th scope="col">Total returns</th>
+                                <th scope="col">Net sales</th>
+                                <th scope="col">Margin</th>
+                                <th scope="col">Cash</th>
+                                <th scope="col">Card / bank</th>
+                                <th scope="col">UPI</th>
+                                <th scope="col">Qty sold</th>
+                                <th scope="col">Loyalty</th>
+                                <th scope="col">Total expenses</th>
+                                <th scope="col">Avg closing bank</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
                     </table>
                 </div>
             </div>
-            <!-- Consolidated from Excel -->
-            <div class="table-card">
-                <h3>Consolidated Data (from Excel)</h3>
+            <div class="card table-card">
+                <h3>Consolidated data (from Excel)</h3>
                 <div class="table-wrapper">
                     <table id="consolidatedTable">
                         <thead>
                             <tr>
-                                <th>Month</th>
-                                <th>Days</th>
-                                <th>Sales</th>
-                                <th>Sales Return</th>
-                                <th>Net Sales</th>
-                                <th>Avg Sales/Day</th>
+                                <th scope="col">Month</th>
+                                <th scope="col">Days</th>
+                                <th scope="col">Sales</th>
+                                <th scope="col">Sales return</th>
+                                <th scope="col">Net sales</th>
+                                <th scope="col">Avg sales / day</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -354,37 +483,66 @@
 
         <!-- All Records Page -->
         <section class="page" id="page-records">
-            <div class="table-controls">
-                <input type="text" id="searchRecords" placeholder="Search by date..." oninput="filterRecords()">
-                <select id="filterMonth" onchange="filterRecords()">
-                    <option value="">All Months</option>
-                </select>
+            <div class="records-controls">
+                <span class="eyebrow" id="rec-count"></span>
+                <div class="records-filters">
+                    <label for="searchRecords" class="sr-only">Search by date</label>
+                    <div class="field search-field">
+                        <svg viewBox="0 0 24 24" aria-hidden="true"><circle cx="11" cy="11" r="7"/><path d="m20 20-3.5-3.5"/></svg>
+                        <input type="search" id="searchRecords" placeholder="Search a date, e.g. 12 Sep" oninput="filterRecords()">
+                    </div>
+                    <label for="filterMonth" class="sr-only">Month</label>
+                    <select id="filterMonth" class="select" onchange="filterRecords()">
+                        <option value="">All months</option>
+                    </select>
+                </div>
             </div>
-            <div class="table-card">
-                <div class="table-wrapper">
-                    <table id="recordsTable">
+
+            <div class="summary-strip">
+                <div class="stat"><span>Gross sales</span><strong id="rec-sale">--</strong></div>
+                <div class="stat"><span>Net sales</span><strong id="rec-net">--</strong></div>
+                <div class="stat"><span>Margin</span><strong id="rec-margin">--</strong></div>
+                <div class="stat"><span>Returns</span><strong class="danger" id="rec-returns">--</strong></div>
+                <div class="stat"><span>Paid out</span><strong id="rec-exp">--</strong></div>
+            </div>
+
+            <div class="chip-row" id="recordChips" role="group" aria-label="Show">
+                <button type="button" class="chip" data-filter="all" aria-pressed="true" onclick="setRecordFilter('all')">All days</button>
+                <button type="button" class="chip" data-filter="ret" aria-pressed="false" onclick="setRecordFilter('ret')">Returns over ₹5,000</button>
+                <button type="button" class="chip" data-filter="exp" aria-pressed="false" onclick="setRecordFilter('exp')">Paid out</button>
+                <button type="button" class="chip" data-filter="txn" aria-pressed="false" onclick="setRecordFilter('txn')">Transfers</button>
+            </div>
+
+            <div class="card table-card">
+                <div class="table-wrapper records-wrap">
+                    <table id="recordsTable" class="records-table">
                         <thead>
+                            <tr class="grp">
+                                <th></th>
+                                <th class="g" colspan="6">Sales</th>
+                                <th class="g" colspan="4">Payments</th>
+                                <th class="g" colspan="4">Position</th>
+                                <th class="g">Expenses</th>
+                                <th class="g"></th>
+                            </tr>
                             <tr>
-                                <th>Date</th>
-                                <th>Sales</th>
-                                <th>Bills</th>
-                                <th>Returns</th>
-                                <th>Net Sales</th>
-                                <th>Qty Sold</th>
-                                <th>Margin</th>
-                                <th>Cash</th>
-                                <th>Bank</th>
-                                <th>UPI</th>
-                                <th>Loyalty</th>
-                                <th>Closing Stock</th>
-                                <th>Closing Bank</th>
-                                <th>Int. Transactions</th>
-                                <th>Orders Placed</th>
-                                <th>Salary</th>
-                                <th>Electricity</th>
-                                <th>Admin Exp.</th>
-                                <th>Total Exp.</th>
-                                <th>Actions</th>
+                                <th scope="col">Date</th>
+                                <th scope="col" class="g">Gross</th>
+                                <th scope="col">Bills</th>
+                                <th scope="col">Returns</th>
+                                <th scope="col">Net</th>
+                                <th scope="col">Qty</th>
+                                <th scope="col">Margin</th>
+                                <th scope="col" class="g">Cash</th>
+                                <th scope="col">Card / bank</th>
+                                <th scope="col">UPI</th>
+                                <th scope="col">Loyalty</th>
+                                <th scope="col" class="g">Stock</th>
+                                <th scope="col">Closing bank</th>
+                                <th scope="col">Transfer</th>
+                                <th scope="col">Orders</th>
+                                <th scope="col" class="g">Paid out</th>
+                                <th scope="col" class="g"><span class="sr-only">Actions</span></th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -393,6 +551,26 @@
             </div>
         </section>
     </main>
+
+    <!-- Bottom navigation (phones) -->
+    <nav class="bottom-nav" aria-label="Quick">
+        <button type="button" class="nav-link active" data-page="dashboard" aria-current="page">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><rect x="3" y="3" width="7" height="9" rx="1.5"/><rect x="14" y="3" width="7" height="5" rx="1.5"/><rect x="14" y="12" width="7" height="9" rx="1.5"/><rect x="3" y="16" width="7" height="5" rx="1.5"/></svg>
+            Today
+        </button>
+        <button type="button" class="nav-link" data-page="entry">
+            <span class="add-pill"><svg viewBox="0 0 24 24" aria-hidden="true"><path d="M12 5v14M5 12h14"/></svg></span>
+            Add entry
+        </button>
+        <button type="button" class="nav-link" data-page="sales">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 3v18h18"/><path d="m7 15 4-4 3 3 5-6"/></svg>
+            Reports
+        </button>
+        <button type="button" class="nav-link" data-page="records">
+            <svg viewBox="0 0 24 24" aria-hidden="true"><path d="M3 5h18M3 12h18M3 19h18"/></svg>
+            Records
+        </button>
+    </nav>
 
     <script src="app.js"></script>
 </body>

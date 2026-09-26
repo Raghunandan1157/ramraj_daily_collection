@@ -86,9 +86,39 @@
                     <div class="kpi-sub" id="kpi-stock-sub"></div>
                 </div>
                 <div class="kpi-card">
-                    <div class="kpi-label">Bank Balance</div>
+                    <div class="kpi-label">Closing Bank</div>
                     <div class="kpi-value" id="kpi-bank">--</div>
                     <div class="kpi-sub" id="kpi-bank-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Margin</div>
+                    <div class="kpi-value" id="kpi-margin">--</div>
+                    <div class="kpi-sub" id="kpi-margin-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Cash</div>
+                    <div class="kpi-value" id="kpi-cash">--</div>
+                    <div class="kpi-sub" id="kpi-cash-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Bank</div>
+                    <div class="kpi-value" id="kpi-banksales">--</div>
+                    <div class="kpi-sub" id="kpi-banksales-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">UPI</div>
+                    <div class="kpi-value" id="kpi-upi">--</div>
+                    <div class="kpi-sub" id="kpi-upi-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Qty Sold</div>
+                    <div class="kpi-value" id="kpi-qty">--</div>
+                    <div class="kpi-sub" id="kpi-qty-sub"></div>
+                </div>
+                <div class="kpi-card">
+                    <div class="kpi-label">Loyalty</div>
+                    <div class="kpi-value" id="kpi-loyalty">--</div>
+                    <div class="kpi-sub" id="kpi-loyalty-sub"></div>
                 </div>
                 <div class="kpi-card">
                     <div class="kpi-label">Orders Placed</div>
@@ -109,7 +139,7 @@
                     <canvas id="dashSalesChart"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3>Bank Balance Trend</h3>
+                    <h3>Closing Bank Trend</h3>
                     <canvas id="dashBankChart"></canvas>
                 </div>
             </div>
@@ -142,11 +172,35 @@
                             <input type="number" step="0.01" id="f-netsales" placeholder="Auto-calculated" readonly>
                         </div>
                         <div class="form-group">
+                            <label for="f-qty">Qty Sold</label>
+                            <input type="number" id="f-qty" placeholder="e.g. 42" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-margin">Margin (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-margin" placeholder="e.g. 6120" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-cash">Cash (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-cash" placeholder="e.g. 20000" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-banksales">Bank (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-banksales" placeholder="Card / bank transfer" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-upi">UPI (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-upi" placeholder="e.g. 18246" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label for="f-loyalty">Loyalty (&#8377;)</label>
+                            <input type="number" step="0.01" id="f-loyalty" placeholder="Loyalty amount" value="0">
+                        </div>
+                        <div class="form-group">
                             <label for="f-stock">Closing Stock (&#8377;)</label>
                             <input type="number" step="0.01" id="f-stock" placeholder="e.g. 6587044" required>
                         </div>
                         <div class="form-group">
-                            <label for="f-bank">Bank Balance (&#8377;)</label>
+                            <label for="f-bank">Closing Bank (&#8377;)</label>
                             <input type="number" step="0.01" id="f-bank" placeholder="e.g. 236005.83" required>
                         </div>
                         <div class="form-group">
@@ -203,12 +257,32 @@
                 </div>
             </div>
             <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>Payment Mode Split (Cash / Bank / UPI)</h3>
+                    <canvas id="paymentChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Margin Trend</h3>
+                    <canvas id="marginChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
+                <div class="chart-card wide">
+                    <h3>Qty Sold &amp; No. of Bills</h3>
+                    <canvas id="qtyBillsChart"></canvas>
+                </div>
+                <div class="chart-card">
+                    <h3>Loyalty Trend</h3>
+                    <canvas id="loyaltyChart"></canvas>
+                </div>
+            </div>
+            <div class="charts-row">
                 <div class="chart-card">
                     <h3>Closing Stock Trend</h3>
                     <canvas id="stockChart"></canvas>
                 </div>
                 <div class="chart-card">
-                    <h3>Bank Balance Trend</h3>
+                    <h3>Closing Bank Trend</h3>
                     <canvas id="bankChart"></canvas>
                 </div>
                 <div class="chart-card">
@@ -243,8 +317,14 @@
                                 <th>Total Bills</th>
                                 <th>Total Returns</th>
                                 <th>Net Sales</th>
+                                <th>Margin</th>
+                                <th>Cash</th>
+                                <th>Bank</th>
+                                <th>UPI</th>
+                                <th>Qty Sold</th>
+                                <th>Loyalty</th>
                                 <th>Total Expenses</th>
-                                <th>Avg Bank Bal.</th>
+                                <th>Avg Closing Bank</th>
                             </tr>
                         </thead>
                         <tbody></tbody>
@@ -290,8 +370,14 @@
                                 <th>Bills</th>
                                 <th>Returns</th>
                                 <th>Net Sales</th>
+                                <th>Qty Sold</th>
+                                <th>Margin</th>
+                                <th>Cash</th>
+                                <th>Bank</th>
+                                <th>UPI</th>
+                                <th>Loyalty</th>
                                 <th>Closing Stock</th>
-                                <th>Bank Balance</th>
+                                <th>Closing Bank</th>
                                 <th>Int. Transactions</th>
                                 <th>Orders Placed</th>
                                 <th>Salary</th>

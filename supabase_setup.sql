@@ -18,6 +18,11 @@ CREATE TABLE IF NOT EXISTS daily_sales (
     admin_expenses NUMERIC(12,2) DEFAULT 0,
     total_expenses NUMERIC(12,2) DEFAULT 0,
     internal_txn NUMERIC(14,2) DEFAULT 0,  -- positive = money IN, negative = money OUT
+    margin NUMERIC(12,2) DEFAULT 0,
+    cash_sales NUMERIC(12,2) DEFAULT 0,
+    bank_sales NUMERIC(12,2) DEFAULT 0,
+    upi_sales NUMERIC(12,2) DEFAULT 0,
+    loyalty NUMERIC(12,2) DEFAULT 0,
     -- Website-specific fields
     open_time TIME DEFAULT '09:30',
     close_time TIME DEFAULT '21:30',

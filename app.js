@@ -33,7 +33,13 @@ async function fetchData() {
                 electricityPaid: Number(row.electricity_paid) || 0,
                 adminExpenses: Number(row.admin_expenses) || 0,
                 totalExpenses: Number(row.total_expenses) || 0,
-                internalTxn: Number(row.internal_txn) || 0
+                internalTxn: Number(row.internal_txn) || 0,
+                qtySold: Number(row.quantity) || 0,
+                margin: Number(row.margin) || 0,
+                cashSales: Number(row.cash_sales) || 0,
+                bankSales: Number(row.bank_sales) || 0,
+                upiSales: Number(row.upi_sales) || 0,
+                loyalty: Number(row.loyalty) || 0
             };
         });
     }
@@ -72,7 +78,13 @@ async function saveToSupabase(entry) {
         electricity_paid: entry.electricityPaid,
         admin_expenses: entry.adminExpenses,
         total_expenses: entry.totalExpenses,
-        internal_txn: entry.internalTxn
+        internal_txn: entry.internalTxn,
+        quantity: entry.qtySold,
+        margin: entry.margin,
+        cash_sales: entry.cashSales,
+        bank_sales: entry.bankSales,
+        upi_sales: entry.upiSales,
+        loyalty: entry.loyalty
     };
 
     const { error } = await db
@@ -216,8 +228,20 @@ async function saveEntry(e) {
         electricityPaid: electricity,
         adminExpenses: admin,
         totalExpenses: salary + electricity + admin,
-        internalTxn: intxnSigned
+        internalTxn: intxnSigned,
+        qtySold: parseInt(document.getElementById('f-qty').value) || 0,
+        margin: parseFloat(document.getElementById('f-margin').value) || 0,
+        cashSales: parseFloat(document.getElementById('f-cash').value) || 0,
+        bankSales: parseFloat(document.getElementById('f-banksales').value) || 0,
+        upiSales: parseFloat(document.getElementById('f-upi').value) || 0,
+        loyalty: parseFloat(document.getElementById('f-loyalty').value) || 0
     };
+
+    const paymentTotal = entry.cashSales + entry.bankSales + entry.upiSales;
+    if (paymentTotal > 0 && Math.abs(paymentTotal - entry.sale) > 1) {
+        showMessage('Cash + Bank + UPI (' + fmtCurrency(paymentTotal) + ') must equal Sales (' + fmtCurrency(entry.sale) + ').', 'error');
+        return false;
+    }
 
     if (!editingDate) {
         if (appData.some(d => d.date === entry.date)) {
@@ -251,6 +275,9 @@ function resetForm() {
     document.getElementById('f-electricity').value = '0';
     document.getElementById('f-admin').value = '0';
     document.getElementById('f-intxn').value = '0';
+    ['f-qty', 'f-margin', 'f-cash', 'f-banksales', 'f-upi', 'f-loyalty'].forEach(id => {
+        document.getElementById(id).value = '0';
+    });
     selectedDirection = null;
     document.getElementById('btn-dir-in').classList.remove('active');
     document.getElementById('btn-dir-out').classList.remove('active');
@@ -283,6 +310,12 @@ function editEntry(date) {
     fAdmin.value = entry.adminExpenses;
     fTotalExp.value = entry.totalExpenses;
     document.getElementById('f-intxn').value = Math.abs(entry.internalTxn);
+    document.getElementById('f-qty').value = entry.qtySold;
+    document.getElementById('f-margin').value = entry.margin;
+    document.getElementById('f-cash').value = entry.cashSales;
+    document.getElementById('f-banksales').value = entry.bankSales;
+    document.getElementById('f-upi').value = entry.upiSales;
+    document.getElementById('f-loyalty').value = entry.loyalty;
     if (entry.internalTxn > 0) selectDirection('IN');
     else if (entry.internalTxn < 0) selectDirection('OUT');
     else { selectedDirection = null; document.getElementById('btn-dir-in').classList.remove('active'); document.getElementById('btn-dir-out').classList.remove('active'); }
@@ -354,7 +387,7 @@ function renderDashboard() {
     const latest = data.length > 0 ? data[data.length - 1] : null;
 
     if (!latest) {
-        ['kpi-sale','kpi-netsales','kpi-bills','kpi-returns','kpi-stock','kpi-bank','kpi-orders','kpi-expenses'].forEach(id => {
+        ['kpi-sale','kpi-netsales','kpi-bills','kpi-returns','kpi-stock','kpi-bank','kpi-margin','kpi-cash','kpi-banksales','kpi-upi','kpi-qty','kpi-loyalty','kpi-orders','kpi-expenses'].forEach(id => {
             document.getElementById(id).textContent = '--';
         });
         return;
@@ -368,6 +401,12 @@ function renderDashboard() {
     document.getElementById('kpi-returns').textContent = fmtCurrency(latest.salesReturns);
     document.getElementById('kpi-stock').textContent = fmtLakhs(latest.closingStock);
     document.getElementById('kpi-bank').textContent = fmtCurrency(latest.bankBalance);
+    document.getElementById('kpi-margin').textContent = fmtCurrency(latest.margin);
+    document.getElementById('kpi-cash').textContent = fmtCurrency(latest.cashSales);
+    document.getElementById('kpi-banksales').textContent = fmtCurrency(latest.bankSales);
+    document.getElementById('kpi-upi').textContent = fmtCurrency(latest.upiSales);
+    document.getElementById('kpi-qty').textContent = fmt(latest.qtySold);
+    document.getElementById('kpi-loyalty').textContent = fmtCurrency(latest.loyalty);
     document.getElementById('kpi-orders').textContent = fmtCurrency(latest.ordersPlaced);
     document.getElementById('kpi-expenses').textContent = fmtCurrency(latest.totalExpenses);
 
@@ -378,6 +417,19 @@ function renderDashboard() {
         setSub('kpi-returns-sub', latest.salesReturns, prev.salesReturns);
         setSub('kpi-stock-sub', latest.closingStock, prev.closingStock);
         setSub('kpi-bank-sub', latest.bankBalance, prev.bankBalance);
+        setSub('kpi-margin-sub', latest.margin, prev.margin);
+        setSub('kpi-cash-sub', latest.cashSales, prev.cashSales);
+        setSub('kpi-banksales-sub', latest.bankSales, prev.bankSales);
+        setSub('kpi-upi-sub', latest.upiSales, prev.upiSales);
+        setSub('kpi-qty-sub', latest.qtySold, prev.qtySold);
+        setSub('kpi-loyalty-sub', latest.loyalty, prev.loyalty);
+    }
+
+    // Margin % of net sales (overrides the day-on-day text for Margin)
+    if (latest.netSales) {
+        const mEl = document.getElementById('kpi-margin-sub');
+        mEl.textContent = ((latest.margin / latest.netSales) * 100).toFixed(1) + '% of net sales';
+        mEl.className = 'kpi-sub';
     }
 
     // Orders — show month total
@@ -426,7 +478,7 @@ function renderDashboard() {
         data: {
             labels,
             datasets: [{
-                label: 'Bank Balance',
+                label: 'Closing Bank',
                 data: data.map(d => d.bankBalance),
                 borderColor: '#3498db',
                 backgroundColor: 'rgba(52,152,219,0.1)',
@@ -459,7 +511,7 @@ function setSub(id, current, previous) {
 }
 
 // ==================== SALES ANALYSIS CHARTS ====================
-let grossNetChart, returnsChart, stockChart, bankChart, expensesChart;
+let grossNetChart, returnsChart, paymentChart, marginChart, qtyBillsChart, loyaltyChart, stockChart, bankChart, expensesChart;
 
 function renderSalesCharts() {
     const data = getData();
@@ -518,6 +570,89 @@ function renderSalesCharts() {
         }
     });
 
+    // Payment mode split (stacked)
+    if (paymentChart) paymentChart.destroy();
+    paymentChart = new Chart(document.getElementById('paymentChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { label: 'Cash', data: data.map(d => d.cashSales), backgroundColor: 'rgba(46,204,113,0.7)', borderRadius: 2 },
+                { label: 'Bank', data: data.map(d => d.bankSales), backgroundColor: 'rgba(52,152,219,0.7)', borderRadius: 2 },
+                { label: 'UPI', data: data.map(d => d.upiSales), backgroundColor: 'rgba(155,89,182,0.7)', borderRadius: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: {
+                x: { stacked: true },
+                y: { stacked: true, ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(0) + 'K' } }
+            }
+        }
+    });
+
+    // Margin
+    if (marginChart) marginChart.destroy();
+    marginChart = new Chart(document.getElementById('marginChart'), {
+        type: 'line',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Margin',
+                data: data.map(d => d.margin),
+                borderColor: '#2ecc71',
+                backgroundColor: 'rgba(46,204,113,0.1)',
+                fill: true,
+                tension: 0.3,
+                pointRadius: 2
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { ticks: { callback: v => '\u20B9' + (v / 1000).toFixed(1) + 'K' } } }
+        }
+    });
+
+    // Qty sold (bars) vs bills (line)
+    if (qtyBillsChart) qtyBillsChart.destroy();
+    qtyBillsChart = new Chart(document.getElementById('qtyBillsChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [
+                { type: 'bar', label: 'Qty Sold', data: data.map(d => d.qtySold), backgroundColor: 'rgba(243,156,18,0.7)', borderRadius: 4 },
+                { type: 'line', label: 'No. of Bills', data: data.map(d => d.bills), borderColor: '#e94560', tension: 0.3, pointRadius: 2 }
+            ]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { position: 'bottom' } },
+            scales: { y: { beginAtZero: true } }
+        }
+    });
+
+    // Loyalty
+    if (loyaltyChart) loyaltyChart.destroy();
+    loyaltyChart = new Chart(document.getElementById('loyaltyChart'), {
+        type: 'bar',
+        data: {
+            labels,
+            datasets: [{
+                label: 'Loyalty',
+                data: data.map(d => d.loyalty),
+                backgroundColor: 'rgba(155,89,182,0.7)',
+                borderRadius: 4
+            }]
+        },
+        options: {
+            responsive: true,
+            plugins: { legend: { display: false } },
+            scales: { y: { beginAtZero: true, ticks: { callback: v => '\u20B9' + fmt(v) } } }
+        }
+    });
+
     // Closing Stock
     if (stockChart) stockChart.destroy();
     stockChart = new Chart(document.getElementById('stockChart'), {
@@ -548,7 +683,7 @@ function renderSalesCharts() {
         data: {
             labels,
             datasets: [{
-                label: 'Bank Balance',
+                label: 'Closing Bank',
                 data: data.map(d => d.bankBalance),
                 borderColor: '#3498db',
                 backgroundColor: 'rgba(52,152,219,0.1)',
@@ -697,6 +832,12 @@ function renderMonthlySummary() {
         const totalBills = entries.reduce((s, e) => s + e.bills, 0);
         const totalReturns = entries.reduce((s, e) => s + e.salesReturns, 0);
         const totalNetSales = entries.reduce((s, e) => s + e.netSales, 0);
+        const totalMargin = entries.reduce((s, e) => s + e.margin, 0);
+        const totalCash = entries.reduce((s, e) => s + e.cashSales, 0);
+        const totalBankSales = entries.reduce((s, e) => s + e.bankSales, 0);
+        const totalUpi = entries.reduce((s, e) => s + e.upiSales, 0);
+        const totalQty = entries.reduce((s, e) => s + e.qtySold, 0);
+        const totalLoyalty = entries.reduce((s, e) => s + e.loyalty, 0);
         const totalExpenses = entries.reduce((s, e) => s + e.totalExpenses, 0);
         const avgBank = entries.reduce((s, e) => s + e.bankBalance, 0) / entries.length;
 
@@ -711,6 +852,12 @@ function renderMonthlySummary() {
             <td>${fmt(totalBills)}</td>
             <td class="${totalReturns > 50000 ? 'text-danger' : ''}">${fmtCurrency(totalReturns)}</td>
             <td>${fmtCurrency(totalNetSales)}</td>
+            <td>${fmtCurrency(totalMargin)}</td>
+            <td>${fmtCurrency(totalCash)}</td>
+            <td>${fmtCurrency(totalBankSales)}</td>
+            <td>${fmtCurrency(totalUpi)}</td>
+            <td>${fmt(totalQty)}</td>
+            <td>${fmtCurrency(totalLoyalty)}</td>
             <td class="${totalExpenses > 200000 ? 'text-danger' : ''}">${fmtCurrency(totalExpenses)}</td>
             <td>${fmtCurrency(avgBank)}</td>
         `;
@@ -771,6 +918,12 @@ function renderRecordsTable() {
             <td>${d.bills}</td>
             <td class="${d.salesReturns > 5000 ? 'text-danger' : ''}">${fmtCurrency(d.salesReturns)}</td>
             <td>${fmtCurrency(d.netSales)}</td>
+            <td>${fmt(d.qtySold)}</td>
+            <td>${fmtCurrency(d.margin)}</td>
+            <td>${fmtCurrency(d.cashSales)}</td>
+            <td>${fmtCurrency(d.bankSales)}</td>
+            <td>${fmtCurrency(d.upiSales)}</td>
+            <td>${fmtCurrency(d.loyalty)}</td>
             <td>${fmtLakhs(d.closingStock)}</td>
             <td>${fmtCurrency(d.bankBalance)}</td>
             <td>${txHtml}</td>
@@ -800,9 +953,10 @@ function exportData() {
         return;
     }
 
-    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Closing Stock', 'Bank Balance', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
+    const headers = ['Date', 'Sales', 'No of Bills', 'Sales Returns', 'Net Sales', 'Qty Sold', 'Margin', 'Cash', 'Bank', 'UPI', 'Loyalty', 'Closing Stock', 'Closing Bank', 'Orders Placed', 'Salary Paid', 'Electricity Paid', 'Admin Expenses', 'Total Expenses'];
     const rows = data.map(d => [
         d.date, d.sale, d.bills, d.salesReturns, d.netSales,
+        d.qtySold, d.margin, d.cashSales, d.bankSales, d.upiSales, d.loyalty,
         d.closingStock, d.bankBalance, d.ordersPlaced,
         d.salaryPaid, d.electricityPaid, d.adminExpenses, d.totalExpenses
     ]);

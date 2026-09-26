@@ -229,11 +229,11 @@
         <!-- Data Entry Page -->
         <section class="page" id="page-entry">
             <div class="entry-layout">
-                <form id="entryForm" class="entry-form" onsubmit="return saveEntry(event)" aria-label="Daily report">
+                <form id="entryForm" class="entry-form" novalidate onsubmit="return saveEntry(event)" aria-label="Daily report">
                     <div class="card date-row">
                         <div class="form-group date-group">
                             <label for="f-date">Report date</label>
-                            <div class="field"><input type="date" id="f-date" required></div>
+                            <div class="field"><input type="date" id="f-date"></div>
                         </div>
                         <span class="edit-badge hidden" id="editBadge"></span>
                     </div>
@@ -243,23 +243,23 @@
                         <div class="form-grid cols-3">
                             <div class="form-group">
                                 <label for="f-sales">Gross sales</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-sales" placeholder="38246" required></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-sales" placeholder="38246"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-bills">No. of bills</label>
-                                <div class="field"><input type="number" min="0" inputmode="numeric" id="f-bills" placeholder="17" required></div>
+                                <div class="field"><input type="number" step="any" inputmode="numeric" id="f-bills" placeholder="17"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-returns">Sales returns</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-returns" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-returns" value="0"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-qty">Qty sold</label>
-                                <div class="field"><input type="number" min="0" inputmode="numeric" id="f-qty" value="0"><span class="suffix" aria-hidden="true">pcs</span></div>
+                                <div class="field"><input type="number" step="any" inputmode="numeric" id="f-qty" value="0"><span class="suffix" aria-hidden="true">pcs</span></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-margin">Margin</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" inputmode="decimal" id="f-margin" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-margin" value="0"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-netsales">Net sales</label>
@@ -269,23 +269,23 @@
                     </section>
 
                     <section class="card form-section">
-                        <div class="section-head"><h2>2 · Payment received</h2><span class="hint">Cash + Card/bank + UPI should equal gross sales</span></div>
+                        <div class="section-head"><h2>2 · Payment received</h2><span class="hint">For reference, compared with gross sales</span></div>
                         <div class="form-grid cols-4">
                             <div class="form-group">
                                 <label for="f-cash">Cash</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-cash" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-cash" value="0"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-banksales">Card / bank</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-banksales" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-banksales" value="0"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-upi">UPI</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-upi" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-upi" value="0"></div>
                             </div>
                             <div class="form-group">
                                 <label for="f-loyalty">Loyalty redeemed</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-loyalty" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-loyalty" value="0"></div>
                             </div>
                         </div>
                         <div class="reconcile">
@@ -307,15 +307,15 @@
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="f-stock">Closing stock</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-stock" placeholder="6587044" required></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-stock" placeholder="6587044"></div>
                                 </div>
                                 <div class="form-group">
                                     <label for="f-bank">Closing bank balance</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" inputmode="decimal" id="f-bank" placeholder="236005.83" required></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-bank" placeholder="236005.83"></div>
                                 </div>
                                 <div class="form-group">
                                     <label for="f-orders">Orders placed with suppliers</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-orders" value="0"></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-orders" value="0"></div>
                                 </div>
                             </div>
                         </section>
@@ -324,15 +324,15 @@
                             <div class="form-grid">
                                 <div class="form-group">
                                     <label for="f-salary">Salary</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-salary" value="0"></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-salary" value="0"></div>
                                 </div>
                                 <div class="form-group">
                                     <label for="f-electricity">Electricity</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-electricity" value="0"></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-electricity" value="0"></div>
                                 </div>
                                 <div class="form-group">
                                     <label for="f-admin">Admin expenses</label>
-                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-admin" value="0"></div>
+                                    <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-admin" value="0"></div>
                                 </div>
                             </div>
                         </section>
@@ -343,7 +343,7 @@
                         <div class="transfer-row">
                             <div class="form-group">
                                 <label for="f-intxn">Amount</label>
-                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="0.01" min="0" inputmode="decimal" id="f-intxn" value="0"></div>
+                                <div class="field"><span class="prefix" aria-hidden="true">₹</span><input type="number" step="any" inputmode="decimal" id="f-intxn" value="0"></div>
                             </div>
                             <div class="direction-toggle" role="group" aria-label="Direction">
                                 <button type="button" id="btn-dir-in" class="dir-btn dir-btn-in" aria-pressed="false" onclick="selectDirection('IN')">In · received</button>
@@ -365,7 +365,6 @@
                             <div class="sum-row"><span>Paid out</span><strong class="danger" id="sum-exp">--</strong></div>
                             <div class="sum-row"><span>Transfer</span><strong id="sum-txn">--</strong></div>
                         </div>
-                        <div class="alert hidden" id="sumAlert" role="alert"></div>
                         <button type="submit" form="entryForm" class="btn-primary block" id="submitBtn">Save entry</button>
                         <button type="button" class="btn-secondary block" onclick="resetForm()">Clear form</button>
                         <div id="entry-message" class="message hidden" role="status"></div>

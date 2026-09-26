@@ -96,9 +96,9 @@ async function saveToSupabase(entry) {
 
     if (error) {
         console.error('Error saving:', error);
-        return false;
+        return error.message || 'check your connection and try again.';
     }
-    return true;
+    return null;
 }
 
 async function deleteFromSupabase(date) {
@@ -371,18 +371,9 @@ function updateEntrySummary() {
     $('sum-exp').textContent = fmtCurrency(expenses);
 
     let txnText = 'None';
-    if (txn && selectedDirection === 'IN') txnText = '+' + fmtCurrency(txn) + ' in';
-    else if (txn && selectedDirection === 'OUT') txnText = '−' + fmtCurrency(txn) + ' out';
-    else if (txn) txnText = fmtCurrency(txn) + ' · pick In or Out';
+    if (txn && selectedDirection === 'OUT') txnText = '−' + fmtCurrency(txn) + ' out';
+    else if (txn) txnText = '+' + fmtCurrency(txn) + ' in';
     $('sum-txn').textContent = txnText;
-
-    const alertEl = $('sumAlert');
-    if (mismatch) {
-        alertEl.textContent = "Payments don't add up to gross sales yet — " + mismatch + '.';
-        alertEl.classList.remove('hidden');
-    } else {
-        alertEl.classList.add('hidden');
-    }
 }
 
 async function saveEntry(e) {
@@ -394,17 +385,14 @@ async function saveEntry(e) {
     const electricity = val('f-electricity');
     const admin = val('f-admin');
 
+    // No entry rules: whatever is typed gets saved. A transfer with no direction picked counts as In.
     const intxnAmt = Math.abs(val('f-intxn'));
-    if (intxnAmt > 0 && !selectedDirection) {
-        showMessage('Choose In or Out for the internal transfer.', 'error');
-        return false;
-    }
-    const intxnSigned = intxnAmt === 0 ? 0 : (selectedDirection === 'OUT' ? -intxnAmt : intxnAmt);
+    const intxnSigned = selectedDirection === 'OUT' ? -intxnAmt : intxnAmt;
 
     const entry = {
-        date: $('f-date').value,
+        date: $('f-date').value || todayISO(),
         sale: sales,
-        bills: parseInt($('f-bills').value) || 0,
+        bills: Math.round(val('f-bills')),
         salesReturns: returns,
         netSales: sales - returns,
         closingStock: val('f-stock'),
@@ -415,7 +403,7 @@ async function saveEntry(e) {
         adminExpenses: admin,
         totalExpenses: salary + electricity + admin,
         internalTxn: intxnSigned,
-        qtySold: parseInt($('f-qty').value) || 0,
+        qtySold: Math.round(val('f-qty')),
         margin: val('f-margin'),
         cashSales: val('f-cash'),
         bankSales: val('f-banksales'),
@@ -423,30 +411,19 @@ async function saveEntry(e) {
         loyalty: val('f-loyalty')
     };
 
-    const paymentTotal = entry.cashSales + entry.bankSales + entry.upiSales;
-    const mismatch = paymentMismatch(entry.sale, paymentTotal);
-    if (mismatch) {
-        showMessage('Cash + Card/bank + UPI (' + fmtCurrency(paymentTotal) + ') must equal gross sales (' + fmtCurrency(entry.sale) + ') — ' + mismatch + '.', 'error');
-        return false;
-    }
-
+    // Saving a date that already has an entry replaces it (upsert on date)
     const dayLabel = fmtDate(entry.date, { weekday: 'short', day: 'numeric', month: 'short' });
-    if (!editingDate && appData.some(d => d.date === entry.date)) {
-        showMessage('An entry for ' + dayLabel + ' already exists. Edit it from All records.', 'error');
-        return false;
-    }
-
-    const verb = editingDate ? 'Updated' : 'Saved';
+    const verb = editingDate || appData.some(d => d.date === entry.date) ? 'Updated' : 'Saved';
     showLoading();
     $('submitBtn').disabled = true;
-    const success = await saveToSupabase(entry);
-    if (success) {
+    const error = await saveToSupabase(entry);
+    if (!error) {
         resetForm();
         showMessage(verb + ' the entry for ' + dayLabel + '.', 'success');
         await fetchData();
         selectedIndex = -1;
     } else {
-        showMessage('Could not save the entry. Check your connection and try again.', 'error');
+        showMessage('Could not save: ' + error, 'error');
     }
     $('submitBtn').disabled = false;
     hideLoading();

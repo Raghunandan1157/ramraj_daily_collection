@@ -1,0 +1,4 @@
+# Served as before on AWS: index.html, app.js, style.css, logo.png only.
+*.sql
+*.py
+.gitignore
